@@ -23,9 +23,13 @@ cdef extern from "cupy_cufft.h" nogil:
     # cuFFT Stream Function
     Result cufftSetStream(Handle plan, driver.Stream streamId)
 
-    # cuFFT Plan Function
+    # cuFFT Plan Functions
     Result cufftMakePlan1d(Handle plan, int nx, Type type, int batch,
                            size_t *workSize)
+    Result cufftMakePlanMany(Handle plan, int rank, int *n, int *inembed,
+                             int istride, int idist, int *onembed, int ostride,
+                             int odist, Type type, int batch,
+                             size_t *workSize)
 
     # cuFFT Exec Function
     Result cufftExecC2C(Handle plan, Complex *idata, Complex *odata,
