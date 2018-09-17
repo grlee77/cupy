@@ -1,5 +1,6 @@
 cimport cython  # NOQA
 import numpy
+cimport numpy as cnp
 
 import cupy
 from cupy.cuda cimport driver
@@ -147,6 +148,82 @@ class Plan1d(object):
         else:
             shape[-1] = self.nx
             return cupy.empty(shape, numpy.float64)
+
+
+class PlanNd(object):
+    def __init__(self, object shape, object inembed, int istride,
+                 int idist, object onembed, int ostride, int odist,
+                 int fft_type, int batch):
+        cdef Handle plan
+        cdef size_t work_size
+        cdef int ndim
+        cdef int* shape_ptr
+        cdef int* inembed_ptr
+        cdef int* onembed_ptr
+        shape = numpy.asarray(shape, dtype=numpy.intp)
+        ndim = len(shape)
+        inembed = numpy.asarray(inembed, dtype=numpy.intp)
+        onembed = numpy.asarray(onembed, dtype=numpy.intp)
+        shape_ptr = <int *>cnp.PyArray_DATA(shape)
+        inembed_ptr = <int *>cnp.PyArray_DATA(inembed)
+        onembed_ptr = <int *>cnp.PyArray_DATA(onembed)
+        stream = stream_module.get_current_stream_ptr()
+        with nogil:
+            result = cufftCreate(&plan)
+            if result == 0:
+                result = cufftSetStream(<Handle>plan, <driver.Stream>stream)
+            if result == 0:
+                result = cufftSetAutoAllocation(plan, 0)
+            if result == 0:
+                result = cufftMakePlanMany(plan, ndim, shape_ptr,
+                                           inembed_ptr, istride, idist,
+                                           onembed_ptr, ostride, odist,
+                                           <Type>fft_type, batch,
+                                           &work_size)
+
+        # cufftMakePlan1d uses large memory when nx has large divisor.
+        # See https://github.com/cupy/cupy/issues/1063
+        if result == 2:
+            cupy.get_default_memory_pool().free_all_blocks()
+            with nogil:
+                result = cufftMakePlanMany(plan, ndim, shape_ptr,
+                                           inembed_ptr, istride, idist,
+                                           onembed_ptr, ostride, odist,
+                                           <Type>fft_type, batch,
+                                           &work_size)
+
+        check_result(result)
+        work_area = memory.alloc(work_size)
+        with nogil:
+            result = cufftSetWorkArea(plan, <void *>(work_area.ptr))
+        check_result(result)
+        self.shape = shape
+        self.fft_type = fft_type
+        self.plan = plan
+        self.work_area = work_area
+
+    def __del__(self):
+        cdef Handle plan = self.plan
+        with nogil:
+            result = cufftDestroy(plan)
+        check_result(result)
+
+    def fft(self, a, out, direction):
+        if self.fft_type == CUFFT_C2C:
+            execC2C(self.plan, a.data, out.data, direction)
+        elif self.fft_type == CUFFT_Z2Z:
+            execZ2Z(self.plan, a.data, out.data, direction)
+        else:
+            raise NotImplementedError("only C2C and Z2Z implemented")
+
+    def get_output_array(self, a):
+        shape = list(a.shape)
+        if self.fft_type == CUFFT_C2C:
+            return cupy.empty(shape, numpy.complex64)
+        elif self.fft_type == CUFFT_Z2Z:
+            return cupy.empty(shape, numpy.complex128)
+        else:
+            raise NotImplementedError("only C2C and Z2Z implemented")
 
 
 cpdef execC2C(size_t plan, size_t idata, size_t odata, int direction):
