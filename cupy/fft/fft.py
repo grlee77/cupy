@@ -134,6 +134,55 @@ def _fft(a, s, axes, norm, direction, value_type='C2C'):
     return a
 
 
+def _exec_fftn(a, direction, value_type, norm, axes):
+    fft_type = _convert_fft_type(a, value_type)
+    if not (fft_type == cufft.CUFFT_C2C or fft_type == cufft.CUFFT_Z2Z):
+        raise NotImplementedError("Only C2C and Z2Z are supported.")
+
+    if a.base is not None:
+        a = a.copy()
+
+    raise NotImplementedError("TODO")
+    plan = cufft.PlanNd(a.shape,
+                        # TODO
+                        fft_type, nbatch)
+    out = plan.get_output_array(a)
+    plan.fft(a, out, direction)
+
+    # normalize by the product of the shape along the transformed axes
+    sz = np.prod([out.shape[ax] for ax in axes])
+    if norm is None:
+        if direction == cufft.CUFFT_INVERSE:
+            out /= sz
+    else:
+        out /= cupy.sqrt(sz)
+
+    return out
+
+
+def _fftn(a, s, axes, norm, direction, value_type='C2C'):
+    if norm not in (None, 'ortho'):
+        raise ValueError('Invalid norm value %s, should be None or \"ortho\".'
+                         % norm)
+
+    if s is not None:
+        raise NotImplementedError("custom s unsupported")
+
+    a = _convert_dtype(a, value_type)
+    if axes is None:
+        dim = a.ndim
+        axes = [i for i in six.moves.range(-dim, 0)]
+
+    if value_type == 'C2C':
+        a = _exec_fftn(a, direction, value_type, norm, axes)
+    elif value_type == 'R2C':
+        raise NotImplementedError("TODO")
+    else:
+        raise NotImplementedError("TODO")
+
+    return a
+
+
 def fft(a, n=None, axis=-1, norm=None):
     """Compute the one-dimensional FFT.
 
@@ -218,7 +267,7 @@ def ifft2(a, s=None, axes=(-2, -1), norm=None):
     return _fft(a, s, axes, norm, cufft.CUFFT_INVERSE)
 
 
-def fftn(a, s=None, axes=None, norm=None):
+def fftn(a, s=None, axes=None, norm=None, plan_nd=False):
     """Compute the N-dimensional FFT.
 
     Args:
@@ -228,6 +277,7 @@ def fftn(a, s=None, axes=None, norm=None):
             axes specified by ``axes`` are used.
         axes (tuple of ints): Axes over which to compute the FFT.
         norm (None or ``"ortho"``): Keyword to specify the normalization mode.
+        plan_nd (bool): If False, use separable 1D Plans, else use an nD Plan
 
     Returns:
         cupy.ndarray:
@@ -236,10 +286,13 @@ def fftn(a, s=None, axes=None, norm=None):
 
     .. seealso:: :func:`numpy.fft.fftn`
     """
-    return _fft(a, s, axes, norm, cufft.CUFFT_FORWARD)
+    if plan_nd:
+        return _fftn(a, s, axes, norm, cufft.CUFFT_FORWARD)
+    else:
+        return _fft(a, s, axes, norm, cufft.CUFFT_FORWARD)
 
 
-def ifftn(a, s=None, axes=None, norm=None):
+def ifftn(a, s=None, axes=None, norm=None, plan_nd=False):
     """Compute the N-dimensional inverse FFT.
 
     Args:
@@ -249,6 +302,7 @@ def ifftn(a, s=None, axes=None, norm=None):
             axes specified by ``axes`` are used.
         axes (tuple of ints): Axes over which to compute the FFT.
         norm (None or ``"ortho"``): Keyword to specify the normalization mode.
+        plan_nd (bool): If False, use separable 1D Plans, else use an nD Plan
 
     Returns:
         cupy.ndarray:
@@ -257,7 +311,10 @@ def ifftn(a, s=None, axes=None, norm=None):
 
     .. seealso:: :func:`numpy.fft.ifftn`
     """
-    return _fft(a, s, axes, norm, cufft.CUFFT_INVERSE)
+    if plan_nd:
+        return _fftn(a, s, axes, norm, cufft.CUFFT_INVERSE)
+    else:
+        return _fft(a, s, axes, norm, cufft.CUFFT_INVERSE)
 
 
 def rfft(a, n=None, axis=-1, norm=None):
