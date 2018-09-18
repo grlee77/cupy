@@ -355,11 +355,11 @@ def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
     elif order == 'F' and not a.flags.f_contiguous:
         a = cupy.asfortranarray(a)
 
-    if value_type in ['C2C', 'Z2Z']:
+    if value_type in 'C2C':
         a = _exec_fftn(a, direction, value_type, norm=norm, axes=axes,
                        order=order, plan=plan, out=out)
     else:
-        raise NotImplementedError("Only C2C and Z2Z have been implemented.")
+        raise NotImplementedError("Only value_type C2C is supported.")
 
     return a
 
