@@ -136,7 +136,7 @@ def _fft(a, s, axes, norm, direction, value_type='C2C'):
     return a
 
 
-def get_plan_nd(shape, fft_type, axes=None, order='C'):
+def get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
     """Generate a CUDA FFT plan for transforming up to three axes.
 
     Args:
@@ -300,7 +300,7 @@ def _exec_fftn(a, direction, value_type, norm, axes, order, plan=None,
 
     if plan is None:
         # generate a plan
-        plan = get_plan_nd(a.shape, fft_type, axes=axes, order=order)
+        plan = get_cufft_plan_nd(a.shape, fft_type, axes=axes, order=order)
     else:
         if not isinstance(plan, cufft.PlanNd):
             raise ValueError("expected plan to have type cufft.PlanNd")
