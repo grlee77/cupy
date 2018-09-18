@@ -31,6 +31,14 @@ cdef extern from "cupy_cufft.h" nogil:
                              int istride, int idist, int *onembed, int ostride,
                              int odist, Type type, int batch,
                              size_t *workSize)
+    # could use cufftMakePlanMany64 instead to support >int32 size/stride
+    # Result cufftMakePlanMany64(Handle plan, int rank, long long int *n,
+    #                            long long int *inembed, long long int istride,
+    #                            long long int idist, long long int *onembed,
+    #                            long long int ostride, long long int odist,
+    #                            Type type, long long int batch,
+    #                            size_t *workSize)
+
 
     # cuFFT Exec Function
     Result cufftExecC2C(Handle plan, Complex *idata, Complex *odata,
@@ -160,13 +168,22 @@ class PlanNd(object):
         cdef int* shape_ptr
         cdef int* inembed_ptr
         cdef int* onembed_ptr
-        shape = numpy.asarray(shape, dtype=numpy.intp)
+        shape = numpy.asarray(shape, dtype=numpy.intc)
         ndim = len(shape)
-        inembed = numpy.asarray(inembed, dtype=numpy.intp)
-        onembed = numpy.asarray(onembed, dtype=numpy.intp)
         shape_ptr = <int *>cnp.PyArray_DATA(shape)
-        inembed_ptr = <int *>cnp.PyArray_DATA(inembed)
-        onembed_ptr = <int *>cnp.PyArray_DATA(onembed)
+
+        if inembed is None:
+            inembed_ptr = NULL  # ignore istride and use default strides
+        else:
+            inembed = numpy.asarray(inembed, dtype=numpy.intc)
+            inembed_ptr = <int *>cnp.PyArray_DATA(inembed)
+
+        if onembed is None:
+            onembed_ptr = NULL  # ignore ostride and use default strides
+        else:
+            onembed = numpy.asarray(onembed, dtype=numpy.intc)
+            onembed_ptr = <int *>cnp.PyArray_DATA(onembed)
+
         stream = stream_module.get_current_stream_ptr()
         with nogil:
             result = cufftCreate(&plan)
@@ -181,8 +198,7 @@ class PlanNd(object):
                                            <Type>fft_type, batch,
                                            &work_size)
 
-        # cufftMakePlan1d uses large memory when nx has large divisor.
-        # See https://github.com/cupy/cupy/issues/1063
+        # cufftMakePlanMany could use a large amount of memory
         if result == 2:
             cupy.get_default_memory_pool().free_all_blocks()
             with nogil:
@@ -193,11 +209,15 @@ class PlanNd(object):
                                            &work_size)
 
         check_result(result)
+
+        # TODO: for CUDA>=9.2 could also allow setting a work area policy
+        # result = cufftXtSetWorkAreaPolicy(plan, policy, &work_size)
+
         work_area = memory.alloc(work_size)
         with nogil:
             result = cufftSetWorkArea(plan, <void *>(work_area.ptr))
         check_result(result)
-        self.shape = shape
+        self.shape = tuple(shape)
         self.fft_type = fft_type
         self.plan = plan
         self.work_area = work_area
@@ -216,14 +236,23 @@ class PlanNd(object):
         else:
             raise NotImplementedError("only C2C and Z2Z implemented")
 
-    def get_output_array(self, a):
+    def get_output_array(self, a, order='C'):
         shape = list(a.shape)
         if self.fft_type == CUFFT_C2C:
-            return cupy.empty(shape, numpy.complex64)
+            return cupy.empty(shape, numpy.complex64, order=order)
         elif self.fft_type == CUFFT_Z2Z:
-            return cupy.empty(shape, numpy.complex128)
+            return cupy.empty(shape, numpy.complex128, order=order)
         else:
             raise NotImplementedError("only C2C and Z2Z implemented")
+
+    def check_output_array(self, a, out):
+        if out.dtype != a.dtype:
+            raise ValueError("output dtype mismatch")
+        if not ((out.flags.f_contiguous == a.flags.f_contiguous) and
+                (out.flags.c_contiguous == a.flags.c_contiguous)):
+            raise ValueError("output contiguity mismatch")
+        if out.shape != a.shape:
+            raise ValueError("output shape mismatch")
 
 
 cpdef execC2C(size_t plan, size_t idata, size_t odata, int direction):

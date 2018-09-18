@@ -1,3 +1,5 @@
+from copy import copy
+
 import six
 
 import numpy as np
@@ -134,19 +136,185 @@ def _fft(a, s, axes, norm, direction, value_type='C2C'):
     return a
 
 
-def _exec_fftn(a, direction, value_type, norm, axes):
+def get_plan_nd(shape, fft_type, axes=None, order='C'):
+    """Generate a CUDA FFT plan for transforming up to three axes.
+
+    Args:
+        shape (tuple of int): The shape of the array to transform
+        axes (None or int or tuple of int):  The axes of the array to
+            transform. Currently, these must be a set of up to three adjacent
+            axes and must nclude either the first or the last axis of the
+            array.  If `None`, it is assumed that all axes are transformed.
+        order ({'C', 'F'}): Specify whether the data to be transformed has C or
+            Fortran ordered data layout.
+        fft_type ({cufft.CUFFT_C2C, cufft.CUFFT_Z2Z}): The FFT type to perform.
+            Currently only complex-to-complex transforms are supported.
+
+    Returns:
+        plan (cufft.PlanNd): The CUFFT Plan. This can be used with
+            cufft.fft.fftn or cufft.fft.ifftn.
+    """
+    ndim = len(shape)
+
+    if fft_type not in [cufft.CUFFT_C2C, cufft.CUFFT_Z2Z]:
+        raise NotImplementedError(
+            "Only cufft.CUFFT_C2C and cufft.CUFFT_Z2Z are supported.")
+
+    if axes is None:
+        # transform over all axes
+        fft_axes = tuple(range(ndim))
+    else:
+        if np.isscalar(axes):
+            axes = (axes, )
+        axes = tuple(axes)
+
+        if np.min(axes) < -ndim or np.max(axes) > ndim - 1:
+            raise ValueError("The specified axes exceed the array dimensions.")
+
+        # sort the provided axes in ascending order
+        fft_axes = tuple(sorted(np.mod(axes, ndim)))
+
+        # make sure the specified axes meet the expectations made below
+        if not np.all(np.diff(fft_axes) == 1):
+            raise ValueError(
+                "The axes to be transformed must be contiguous and repeated "
+                "axes are not allowed.")
+        if (0 not in fft_axes) and ((ndim - 1) not in fft_axes):
+            raise ValueError(
+                "Either the first or the last axis of the array must be in "
+                "axes.")
+
+    if len(fft_axes) < 1 or len(fft_axes) > 3:
+        raise ValueError(
+            ("CUFFT can only transform along 1, 2 or 3 axes, but {} axes were "
+             "specified.").format(len(fft_axes)))
+
+    if order not in ['C', 'F']:
+        raise ValueError("order must be 'C' or 'F'")
+
+    """
+    For full details on idist, istride, iembed, etc. see:
+    http://docs.nvidia.com/cuda/cufft/index.html#advanced-data-layout
+
+    in 1D:
+    input[b * idist + x * istride]
+    output[b * odist + x * ostride]
+
+    in 2D:
+    input[b * idist + (x * inembed[1] + y) * istride]
+    output[b * odist + (x * onembed[1] + y) * ostride]
+
+    in 3D:
+    input[b * idist + ((x * inembed[1] + y) * inembed[2] + z) * istride]
+    output[b * odist + ((x * onembed[1] + y) * onembed[2] + z) * ostride]
+    """
+    if fft_axes == tuple(np.arange(ndim)):
+        # tranfsorm over all axes
+        plan_dimensions = copy(shape)
+        if order == 'F':
+            plan_dimensions = plan_dimensions[::-1]
+        idist = np.intp(np.prod(shape))
+        odist = np.intp(np.prod(shape))
+        istride = ostride = 1
+        inembed = onembed = None
+        nbatch = 1
+    else:
+        plan_dimensions = []
+        for d in range(ndim):
+            if d in fft_axes:
+                plan_dimensions.append(shape[d])
+        plan_dimensions = tuple(plan_dimensions)
+        if order == 'F':
+            plan_dimensions = plan_dimensions[::-1]
+        inembed = np.asarray(plan_dimensions, dtype=int)
+        onembed = np.asarray(plan_dimensions, dtype=int)
+        if 0 not in fft_axes:
+            # don't FFT along the first min_axis_fft axes
+            min_axis_fft = np.min(fft_axes)
+            nbatch = np.prod(shape[:min_axis_fft])
+            if order == 'C':
+                # C-ordered GPU array with batch along first dim
+                idist = np.prod(plan_dimensions)
+                odist = np.prod(plan_dimensions)
+                istride = 1
+                ostride = 1
+            elif order == 'F':
+                # F-ordered GPU array with batch along first dim
+                idist = 1
+                odist = 1
+                istride = nbatch
+                ostride = nbatch
+        elif (ndim - 1) not in fft_axes:
+            # don't FFT along the last axis
+            num_axes_batch = ndim - len(fft_axes)
+            nbatch = np.prod(shape[-num_axes_batch:])
+            if order == 'C':
+                # C-ordered GPU array with batch along last dim
+                idist = 1
+                odist = 1
+                istride = nbatch
+                ostride = nbatch
+            elif order == 'F':
+                # F-ordered GPU array with batch along last dim
+                idist = np.prod(plan_dimensions)
+                odist = np.prod(plan_dimensions)
+                istride = 1
+                ostride = 1
+        else:
+            raise ValueError(
+                "General subsets of FFT axes not currently supported for "
+                "GPU case (Can only batch FFT over the first or last "
+                "spatial axis).")
+
+    plan = cufft.PlanNd(shape=plan_dimensions,
+                        istride=istride,
+                        ostride=ostride,
+                        inembed=inembed,
+                        onembed=onembed,
+                        idist=idist,
+                        odist=odist,
+                        fft_type=fft_type,
+                        batch=nbatch)
+    return plan
+
+
+def _check_output_array(a, out):
+    if out.dtype != a.dtype:
+        raise ValueError("output dtype mismatch")
+    if not ((out.flags.f_contiguous == a.flags.f_contiguous) and
+            (out.flags.c_contiguous == a.flags.c_contiguous)):
+        raise ValueError("output contiguity mismatch")
+    if out.shape != a.shape:
+        raise ValueError("output shape mismatch")
+
+
+def _exec_fftn(a, direction, value_type, norm, axes, order, plan=None,
+               out=None):
+
     fft_type = _convert_fft_type(a, value_type)
-    if not (fft_type == cufft.CUFFT_C2C or fft_type == cufft.CUFFT_Z2Z):
+    if fft_type not in [cufft.CUFFT_C2C, cufft.CUFFT_Z2Z]:
         raise NotImplementedError("Only C2C and Z2Z are supported.")
 
     if a.base is not None:
         a = a.copy()
 
-    raise NotImplementedError("TODO")
-    plan = cufft.PlanNd(a.shape,
-                        # TODO
-                        fft_type, nbatch)
-    out = plan.get_output_array(a)
+    if plan is None:
+        # generate a plan
+        plan = get_plan_nd(a.shape, fft_type, axes=axes, order=order)
+    else:
+        if not isinstance(plan, cufft.PlanNd):
+            raise ValueError("expected plan to have type cufft.PlanNd")
+        if a.shape != plan.shape:
+            raise ValueError("The CUFFT plan and a.shape do not match.")
+        if fft_type != plan.fft_type:
+            raise ValueError("The CUFFT plan has a.dtype do not match.")
+        # TODO: also check the strides and axes of the plan?
+
+    if out is None:
+        out = plan.get_output_array(a, order=order)
+    else:
+        if out is not a:
+            _check_output_array(a, out)
     plan.fft(a, out, direction)
 
     # normalize by the product of the shape along the transformed axes
@@ -160,7 +328,8 @@ def _exec_fftn(a, direction, value_type, norm, axes):
     return out
 
 
-def _fftn(a, s, axes, norm, direction, value_type='C2C'):
+def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
+          out=None):
     if norm not in (None, 'ortho'):
         raise ValueError('Invalid norm value %s, should be None or \"ortho\".'
                          % norm)
@@ -172,13 +341,25 @@ def _fftn(a, s, axes, norm, direction, value_type='C2C'):
     if axes is None:
         dim = a.ndim
         axes = [i for i in six.moves.range(-dim, 0)]
+    axes = tuple(axes)
 
-    if value_type == 'C2C':
-        a = _exec_fftn(a, direction, value_type, norm, axes)
-    elif value_type == 'R2C':
-        raise NotImplementedError("TODO")
+    if order == 'A':
+        if a.flags.f_contiguous:
+            order = 'F'
+        elif a.flags.c_contiguous:
+            order = 'C'
+        else:
+            raise ValueError("Expected a contiguous input array.")
+    elif order == 'C' and not a.flags.c_contiguous:
+        a = cupy.ascontiguousarray(a)
+    elif order == 'F' and not a.flags.f_contiguous:
+        a = cupy.asfortranarray(a)
+
+    if value_type in ['C2C', 'Z2Z']:
+        a = _exec_fftn(a, direction, value_type, norm=norm, axes=axes,
+                       order=order, plan=plan, out=out)
     else:
-        raise NotImplementedError("TODO")
+        raise NotImplementedError("Only C2C and Z2Z have been implemented.")
 
     return a
 
@@ -267,7 +448,7 @@ def ifft2(a, s=None, axes=(-2, -1), norm=None):
     return _fft(a, s, axes, norm, cufft.CUFFT_INVERSE)
 
 
-def fftn(a, s=None, axes=None, norm=None, plan_nd=False):
+def fftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None):
     """Compute the N-dimensional FFT.
 
     Args:
@@ -277,7 +458,14 @@ def fftn(a, s=None, axes=None, norm=None, plan_nd=False):
             axes specified by ``axes`` are used.
         axes (tuple of ints): Axes over which to compute the FFT.
         norm (None or ``"ortho"``): Keyword to specify the normalization mode.
-        plan_nd (bool): If False, use separable 1D Plans, else use an nD Plan
+        plan_type (``"1d"`` or ``"nd"``): If ``"1d"`` perform separable 1D
+            planning. If ``"nd"`` use an n-dimensional plan. ``"nd"`` can
+            provide higher performance in some cases, but is limited to at most
+            3 contiguous axes and either the first or last axis must be
+            included in ``axes``.
+        plan (None or cufft.PlanNd): The CUFFT plan for use when plan_type
+            is ``"nd"``. If None, a new plan is created. This argument is
+            ignored when plan_type is ``"1d"``.
 
     Returns:
         cupy.ndarray:
@@ -286,13 +474,16 @@ def fftn(a, s=None, axes=None, norm=None, plan_nd=False):
 
     .. seealso:: :func:`numpy.fft.fftn`
     """
-    if plan_nd:
-        return _fftn(a, s, axes, norm, cufft.CUFFT_FORWARD)
+    if plan_type == 'nd':
+        return _fftn(a, s, axes, norm, cufft.CUFFT_FORWARD, plan=plan)
     else:
+        if plan is not None:
+            raise ValueError("User-provided plan only supported when "
+                             "plan_type is 'nd'.")
         return _fft(a, s, axes, norm, cufft.CUFFT_FORWARD)
 
 
-def ifftn(a, s=None, axes=None, norm=None, plan_nd=False):
+def ifftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None):
     """Compute the N-dimensional inverse FFT.
 
     Args:
@@ -302,7 +493,14 @@ def ifftn(a, s=None, axes=None, norm=None, plan_nd=False):
             axes specified by ``axes`` are used.
         axes (tuple of ints): Axes over which to compute the FFT.
         norm (None or ``"ortho"``): Keyword to specify the normalization mode.
-        plan_nd (bool): If False, use separable 1D Plans, else use an nD Plan
+        plan_type (``"1d"`` or ``"nd"``): If ``"1d"`` perform separable 1D
+            planning. If ``"nd"`` use an n-dimensional plan. ``"nd"`` can
+            provide higher performance in some cases, but is limited to at most
+            3 contiguous axes and either the first or last axis must be
+            included in ``axes``.
+        plan (None or cufft.PlanNd): The CUFFT plan for use when plan_type
+            is ``"nd"``. If None, a new plan is created. This argument is
+            ignored when plan_type is ``"1d"``.
 
     Returns:
         cupy.ndarray:
@@ -311,9 +509,12 @@ def ifftn(a, s=None, axes=None, norm=None, plan_nd=False):
 
     .. seealso:: :func:`numpy.fft.ifftn`
     """
-    if plan_nd:
-        return _fftn(a, s, axes, norm, cufft.CUFFT_INVERSE)
+    if plan_type == 'nd':
+        return _fftn(a, s, axes, norm, cufft.CUFFT_INVERSE, plan=plan)
     else:
+        if plan is not None:
+            raise ValueError("User-provided plan only supported when "
+                             "plan_type is 'nd'.")
         return _fft(a, s, axes, norm, cufft.CUFFT_INVERSE)
 
 
