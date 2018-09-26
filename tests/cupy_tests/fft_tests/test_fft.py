@@ -156,6 +156,69 @@ class TestFftn(unittest.TestCase):
         return out
 
 
+# TODO: support 's' != None
+#       support any 3 non-contiguous axes (not just first or last 3)
+@testing.parameterize(
+    {'shape': (3, 4), 's': None, 'axes': None, 'norm': None},
+    # {'shape': (3, 4), 's': (1, None), 'axes': None, 'norm': None}, # TODO
+    # {'shape': (3, 4), 's': (1, 5), 'axes': None, 'norm': None}, # TODO
+    {'shape': (3, 4), 's': None, 'axes': (-2, -1), 'norm': None},
+    {'shape': (3, 4), 's': None, 'axes': (-1, -2), 'norm': None},
+    {'shape': (3, 4), 's': None, 'axes': (0,), 'norm': None},
+    {'shape': (3, 4), 's': None, 'axes': None, 'norm': 'ortho'},
+    {'shape': (2, 3, 4), 's': None, 'axes': None, 'norm': None},
+    # {'shape': (2, 3, 4), 's': (1, 4, None), 'axes': None, 'norm': None}, # TODO
+    # {'shape': (2, 3, 4), 's': (1, 4, 10), 'axes': None, 'norm': None}, # TODO
+    {'shape': (2, 3, 4), 's': None, 'axes': (-3, -2, -1), 'norm': None},
+    {'shape': (2, 3, 4), 's': None, 'axes': (-1, -2, -3), 'norm': None},
+    {'shape': (2, 3, 4), 's': None, 'axes': (0, 1), 'norm': None},
+    {'shape': (2, 3, 4), 's': None, 'axes': None, 'norm': 'ortho'},
+    # {'shape': (2, 3, 4), 's': (2, 3), 'axes': (0, 1, 2), 'norm': 'ortho'}, # TODO
+    # plan_type='nd' can transform along up to 3 contiguous axes at start or end
+    {'shape': (2, 3, 4, 5), 's': None, 'axes': (0, 1, 2), 'norm': None},
+    {'shape': (2, 3, 4, 5), 's': None, 'axes': (-3, -2, -1), 'norm': None},
+    {'shape': (2, 3, 4, 5, 6), 's': None, 'axes': (0, 1, 2), 'norm': None},
+    {'shape': (2, 3, 4, 5, 6), 's': None, 'axes': (-1, -2, -3), 'norm': None},
+)
+@testing.gpu
+@testing.with_requires('numpy>=1.10.0')
+class TestFftnPlanNd(unittest.TestCase):
+
+    @testing.for_all_dtypes()
+    @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
+                                 contiguous_check=False)
+    def test_fftn(self, xp, dtype):
+        a = testing.shaped_random(self.shape, xp, dtype)
+        if xp == cupy:
+            extra_kwargs = dict(plan_type='nd')
+        else:
+            extra_kwargs = {}
+        out = xp.fft.fftn(a, s=self.s, axes=self.axes, norm=self.norm,
+                          **extra_kwargs)
+
+        if xp == np and dtype in [np.float16, np.float32, np.complex64]:
+            out = out.astype(np.complex64)
+
+        return out
+
+    @testing.for_all_dtypes()
+    @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
+                                 contiguous_check=False)
+    def test_ifftn(self, xp, dtype):
+        a = testing.shaped_random(self.shape, xp, dtype)
+        if xp == cupy:
+            extra_kwargs = dict(plan_type='nd')
+        else:
+            extra_kwargs = {}
+        out = xp.fft.ifftn(a, s=self.s, axes=self.axes, norm=self.norm,
+                           **extra_kwargs)
+
+        if xp == np and dtype in [np.float16, np.float32, np.complex64]:
+            out = out.astype(np.complex64)
+
+        return out
+
+
 @testing.parameterize(*testing.product({
     'n': [None, 5, 10, 15],
     'shape': [(10,), (10, 10)],
