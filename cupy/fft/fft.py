@@ -6,6 +6,7 @@ import numpy as np
 
 import cupy
 from cupy.cuda import cufft
+from math import sqrt
 
 
 def _convert_dtype(a, value_type):
@@ -83,7 +84,7 @@ def _exec_fft(a, direction, value_type, norm, axis, out_size=None):
         if direction == cufft.CUFFT_INVERSE:
             out /= sz
     else:
-        out /= cupy.sqrt(sz)
+        out /= sqrt(sz)
 
     if axis % a.ndim != a.ndim - 1:
         out = out.swapaxes(axis, -1)
@@ -264,7 +265,7 @@ def get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
             raise ValueError(
                 "General subsets of FFT axes not currently supported for "
                 "GPU case (Can only batch FFT over the first or last "
-                "spatial axis).")
+                "spatial axes).")
 
     plan = cufft.PlanNd(shape=plan_dimensions,
                         istride=istride,
@@ -323,7 +324,7 @@ def _exec_fftn(a, direction, value_type, norm, axes, order, plan=None,
         if direction == cufft.CUFFT_INVERSE:
             out /= sz
     else:
-        out /= cupy.sqrt(sz)
+        out /= sqrt(sz)
 
     return out
 
@@ -349,7 +350,9 @@ def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
         elif a.flags.c_contiguous:
             order = 'C'
         else:
-            raise ValueError("Expected a contiguous input array.")
+            a = cupy.ascontiguousarray(a)
+            order = 'C'
+            # raise ValueError("Expected a contiguous input array.")
     elif order == 'C' and not a.flags.c_contiguous:
         a = cupy.ascontiguousarray(a)
     elif order == 'F' and not a.flags.f_contiguous:
@@ -448,7 +451,7 @@ def ifft2(a, s=None, axes=(-2, -1), norm=None):
     return _fft(a, s, axes, norm, cufft.CUFFT_INVERSE)
 
 
-def fftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None):
+def fftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None, out=None):
     """Compute the N-dimensional FFT.
 
     Args:
@@ -466,6 +469,9 @@ def fftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None):
         plan (None or cufft.PlanNd): The CUFFT plan for use when plan_type
             is ``"nd"``. If None, a new plan is created. This argument is
             ignored when plan_type is ``"1d"``.
+        out (None or cupy.ndarray): The array to store the output. If None, a
+            new cupy.ndarray will be created. It is possible to also pass `a`
+            to `out` for an in-place transform.
 
     Returns:
         cupy.ndarray:
@@ -475,15 +481,19 @@ def fftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None):
     .. seealso:: :func:`numpy.fft.fftn`
     """
     if plan_type == 'nd':
-        return _fftn(a, s, axes, norm, cufft.CUFFT_FORWARD, plan=plan)
+        return _fftn(a, s, axes, norm, cufft.CUFFT_FORWARD, plan=plan, out=out)
     else:
         if plan is not None:
-            raise ValueError("User-provided plan only supported when "
-                             "plan_type is 'nd'.")
+            raise ValueError(
+                "User-provided plan only supported when plan_type is 'nd'.")
+        if out is not None:
+            raise ValueError(
+                "Preallocated out only supported when plan_type is 'nd'")
         return _fft(a, s, axes, norm, cufft.CUFFT_FORWARD)
 
 
-def ifftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None):
+def ifftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None,
+          out=None):
     """Compute the N-dimensional inverse FFT.
 
     Args:
@@ -501,6 +511,9 @@ def ifftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None):
         plan (None or cufft.PlanNd): The CUFFT plan for use when plan_type
             is ``"nd"``. If None, a new plan is created. This argument is
             ignored when plan_type is ``"1d"``.
+        out (None or cupy.ndarray): The array to store the output. If None, a
+            new cupy.ndarray will be created. It is possible to also pass `a`
+            to `out` for an in-place transform.
 
     Returns:
         cupy.ndarray:
@@ -510,11 +523,14 @@ def ifftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None):
     .. seealso:: :func:`numpy.fft.ifftn`
     """
     if plan_type == 'nd':
-        return _fftn(a, s, axes, norm, cufft.CUFFT_INVERSE, plan=plan)
+        return _fftn(a, s, axes, norm, cufft.CUFFT_INVERSE, plan=plan, out=out)
     else:
         if plan is not None:
             raise ValueError("User-provided plan only supported when "
                              "plan_type is 'nd'.")
+        if out is not None:
+            raise ValueError(
+                "Preallocated out only supported when plan_type is 'nd'")
         return _fft(a, s, axes, norm, cufft.CUFFT_INVERSE)
 
 
