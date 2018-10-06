@@ -281,7 +281,8 @@ def get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
 
 def _check_output_array(a, out):
     if out.dtype != a.dtype:
-        raise ValueError("output dtype mismatch")
+        raise ValueError("output dtype mismatch: found {}, expected {}".format(
+            out.dtype, a.dtype))
     if not ((out.flags.f_contiguous == a.flags.f_contiguous) and
             (out.flags.c_contiguous == a.flags.c_contiguous)):
         raise ValueError("output contiguity mismatch")
@@ -305,8 +306,10 @@ def _exec_fftn(a, direction, value_type, norm, axes, order, plan=None,
     else:
         if not isinstance(plan, cufft.PlanNd):
             raise ValueError("expected plan to have type cufft.PlanNd")
-        if a.shape != plan.shape:
-            raise ValueError("The CUFFT plan and a.shape do not match.")
+        if tuple(a.shape[ax] for ax in axes) != plan.shape:
+            raise ValueError(
+                "The CUFFT plan and a.shape do not match: "
+                "plan.shape = {}, a.shape = {}".format(plan.shape, tuple(a.shape[ax] for ax in axes)))
         if fft_type != plan.fft_type:
             raise ValueError("The CUFFT plan has a.dtype do not match.")
         # TODO: also check the strides and axes of the plan?
@@ -344,6 +347,9 @@ def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
         axes = [i for i in six.moves.range(-dim, 0)]
     axes = tuple(axes)
 
+    # sort the provided axes in ascending order
+    axes = tuple(sorted(np.mod(axes, a.ndim)))
+
     if order == 'A':
         if a.flags.f_contiguous:
             order = 'F'
@@ -358,12 +364,8 @@ def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
     elif order == 'F' and not a.flags.f_contiguous:
         a = cupy.asfortranarray(a)
 
-    if value_type in 'C2C':
-        a = _exec_fftn(a, direction, value_type, norm=norm, axes=axes,
-                       order=order, plan=plan, out=out)
-    else:
-        raise NotImplementedError("Only value_type C2C is supported.")
-
+    a = _exec_fftn(a, direction, value_type, norm=norm, axes=axes,
+                   order=order, plan=plan, out=out)
     return a
 
 

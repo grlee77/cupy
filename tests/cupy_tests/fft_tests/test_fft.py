@@ -170,7 +170,6 @@ class TestFftn(unittest.TestCase):
     # {'shape': (2, 3, 4), 's': (1, 4, None), 'axes': None, 'norm': None}, # TODO
     # {'shape': (2, 3, 4), 's': (1, 4, 10), 'axes': None, 'norm': None}, # TODO
     {'shape': (2, 3, 4), 's': None, 'axes': (-3, -2, -1), 'norm': None},
-    {'shape': (2, 3, 4), 's': None, 'axes': (-1, -2, -3), 'norm': None},
     {'shape': (2, 3, 4), 's': None, 'axes': (0, 1), 'norm': None},
     {'shape': (2, 3, 4), 's': None, 'axes': None, 'norm': 'ortho'},
     # {'shape': (2, 3, 4), 's': (2, 3), 'axes': (0, 1, 2), 'norm': 'ortho'}, # TODO
@@ -193,8 +192,9 @@ class TestFftnPlanNd(unittest.TestCase):
             extra_kwargs = dict(plan_type='nd')
         else:
             extra_kwargs = {}
-        out = xp.fft.fftn(a, s=self.s, axes=self.axes, norm=self.norm,
-                          **extra_kwargs)
+
+        out = xp.fft.ifftn(a, s=self.s, axes=self.axes, norm=self.norm,
+                           **extra_kwargs)
 
         if xp == np and dtype in [np.float16, np.float32, np.complex64]:
             out = out.astype(np.complex64)
@@ -212,6 +212,116 @@ class TestFftnPlanNd(unittest.TestCase):
             extra_kwargs = {}
         out = xp.fft.ifftn(a, s=self.s, axes=self.axes, norm=self.norm,
                            **extra_kwargs)
+
+        if xp == np and dtype in [np.float16, np.float32, np.complex64]:
+            out = out.astype(np.complex64)
+
+        return out
+
+    @testing.for_all_dtypes()
+    @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
+                                 contiguous_check=False)
+    def test_ifftn_out(self, xp, dtype):
+        a = testing.shaped_random(self.shape, xp, dtype)
+        if xp == cupy:
+            if a.dtype in [np.complex64, np.complex128]:
+                # in-place transform possible for complex64 and complex128
+                out = a
+            else:
+                if a.dtype in [np.float16, np.float32, np.complex64]:
+                    out_dtype = np.complex64
+                else:
+                    out_dtype = np.complex128
+                out = cupy.empty(a.shape,
+                                 dtype=out_dtype)
+            extra_kwargs = dict(plan_type='nd', out=out)
+
+            xp.fft.ifftn(a, s=self.s, axes=self.axes, norm=self.norm,
+                         **extra_kwargs)
+        else:
+            out = xp.fft.ifftn(a, s=self.s, axes=self.axes, norm=self.norm)
+
+        if xp == np and dtype in [np.float16, np.float32, np.complex64]:
+            out = out.astype(np.complex64)
+
+        return out
+
+    @testing.for_all_dtypes()
+    @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
+                                 contiguous_check=False)
+    def test_fftn_out(self, xp, dtype):
+        a = testing.shaped_random(self.shape, xp, dtype)
+        if xp == cupy:
+            if a.dtype in [np.complex64, np.complex128]:
+                # in-place transform possible for complex64 and complex128
+                out = a
+            else:
+                if a.dtype in [np.float16, np.float32, np.complex64]:
+                    out_dtype = np.complex64
+                else:
+                    out_dtype = np.complex128
+                out = cupy.empty(a.shape,
+                                 dtype=out_dtype)
+            extra_kwargs = dict(plan_type='nd', out=out)
+
+            xp.fft.fftn(a, s=self.s, axes=self.axes, norm=self.norm,
+                        **extra_kwargs)
+        else:
+            out = xp.fft.fftn(a, s=self.s, axes=self.axes, norm=self.norm)
+
+        if xp == np and dtype in [np.float16, np.float32, np.complex64]:
+            out = out.astype(np.complex64)
+
+        return out
+
+    @testing.for_all_dtypes()
+    @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
+                                 contiguous_check=False)
+    def test_ifftn_preplan(self, xp, dtype):
+        a = testing.shaped_random(self.shape, xp, dtype)
+        if xp == cupy:
+            if a.dtype in [np.float16, np.float32, np.complex64]:
+                fft_type = cupy.cuda.cufft.CUFFT_C2C
+            else:
+                fft_type = cupy.cuda.cufft.CUFFT_Z2Z
+
+            plan = cupy.fft.get_cufft_plan_nd(
+                a.shape, fft_type=fft_type, axes=self.axes,
+                order='C')
+
+            extra_kwargs = dict(plan_type='nd', plan=plan)
+        else:
+            extra_kwargs = {}
+
+        out = xp.fft.ifftn(a, s=self.s, axes=self.axes, norm=self.norm,
+                           **extra_kwargs)
+
+        if xp == np and dtype in [np.float16, np.float32, np.complex64]:
+            out = out.astype(np.complex64)
+
+        return out
+
+    @testing.for_all_dtypes()
+    @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
+                                 contiguous_check=False)
+    def test_fftn_preplan(self, xp, dtype):
+        a = testing.shaped_random(self.shape, xp, dtype)
+        if xp == cupy:
+            if a.dtype in [np.float16, np.float32, np.complex64]:
+                fft_type = cupy.cuda.cufft.CUFFT_C2C
+            else:
+                fft_type = cupy.cuda.cufft.CUFFT_Z2Z
+
+            plan = cupy.fft.get_cufft_plan_nd(
+                a.shape, fft_type=fft_type, axes=self.axes,
+                order='C')
+
+            extra_kwargs = dict(plan_type='nd', plan=plan)
+        else:
+            extra_kwargs = {}
+
+        out = xp.fft.fftn(a, s=self.s, axes=self.axes, norm=self.norm,
+                          **extra_kwargs)
 
         if xp == np and dtype in [np.float16, np.float32, np.complex64]:
             out = out.astype(np.complex64)
