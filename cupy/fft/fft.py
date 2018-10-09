@@ -338,8 +338,8 @@ def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
         raise ValueError('Invalid norm value %s, should be None or \"ortho\".'
                          % norm)
 
-    if s is not None:
-        raise NotImplementedError("custom s unsupported")
+    if (s is not None) and (axes is not None) and len(s) != len(axes):
+        raise ValueError("Shape and axes have different lengths.")
 
     a = _convert_dtype(a, value_type)
     if axes is None:
@@ -349,6 +349,8 @@ def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
 
     # sort the provided axes in ascending order
     axes = tuple(sorted(np.mod(axes, a.ndim)))
+
+    a = _cook_shape(a, s, axes, value_type)
 
     if order == 'A':
         if a.flags.f_contiguous:

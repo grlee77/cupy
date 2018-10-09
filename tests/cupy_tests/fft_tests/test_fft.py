@@ -156,23 +156,23 @@ class TestFftn(unittest.TestCase):
         return out
 
 
-# TODO: support 's' != None
-#       support any 3 non-contiguous axes (not just first or last 3)
+# TODO:  support any 3 non-contiguous axes (not just first or last 3)
 @testing.parameterize(
     {'shape': (3, 4), 's': None, 'axes': None, 'norm': None},
-    # {'shape': (3, 4), 's': (1, None), 'axes': None, 'norm': None}, # TODO
-    # {'shape': (3, 4), 's': (1, 5), 'axes': None, 'norm': None}, # TODO
+    {'shape': (3, 4), 's': (1, None), 'axes': None, 'norm': None},
+    {'shape': (3, 4), 's': (1, 5), 'axes': None, 'norm': None},
     {'shape': (3, 4), 's': None, 'axes': (-2, -1), 'norm': None},
     {'shape': (3, 4), 's': None, 'axes': (-1, -2), 'norm': None},
     {'shape': (3, 4), 's': None, 'axes': (0,), 'norm': None},
     {'shape': (3, 4), 's': None, 'axes': None, 'norm': 'ortho'},
     {'shape': (2, 3, 4), 's': None, 'axes': None, 'norm': None},
-    # {'shape': (2, 3, 4), 's': (1, 4, None), 'axes': None, 'norm': None}, # TODO
-    # {'shape': (2, 3, 4), 's': (1, 4, 10), 'axes': None, 'norm': None}, # TODO
+    {'shape': (2, 3, 4), 's': (1, 4, None), 'axes': None, 'norm': None},
+    {'shape': (2, 3, 4), 's': (1, 4, 10), 'axes': None, 'norm': None},
     {'shape': (2, 3, 4), 's': None, 'axes': (-3, -2, -1), 'norm': None},
     {'shape': (2, 3, 4), 's': None, 'axes': (0, 1), 'norm': None},
     {'shape': (2, 3, 4), 's': None, 'axes': None, 'norm': 'ortho'},
-    # {'shape': (2, 3, 4), 's': (2, 3), 'axes': (0, 1, 2), 'norm': 'ortho'}, # TODO
+    # invalid shape
+    {'shape': (2, 3, 4), 's': (2, 3), 'axes': (0, 1, 2), 'norm': 'ortho'},
     # plan_type='nd' can transform along up to 3 contiguous axes at start or end
     {'shape': (2, 3, 4, 5), 's': None, 'axes': (0, 1, 2), 'norm': None},
     {'shape': (2, 3, 4, 5), 's': None, 'axes': (-3, -2, -1), 'norm': None},
@@ -218,13 +218,28 @@ class TestFftnPlanNd(unittest.TestCase):
 
         return out
 
+    def _out_shape(self, a_shape):
+        """Return the expected output shape."""
+        if self.s is None:
+            return a_shape
+
+        out_shape = []
+        for n, s in enumerate(self.s):
+            if s is None:
+                out_shape.append(a_shape[n])
+            else:
+                out_shape.append(s)
+        return tuple(out_shape)
+
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
                                  contiguous_check=False)
     def test_ifftn_out(self, xp, dtype):
         a = testing.shaped_random(self.shape, xp, dtype)
         if xp == cupy:
-            if a.dtype in [np.complex64, np.complex128]:
+            out_shape = self._out_shape(a.shape)
+            if (a.dtype in [np.complex64, np.complex128] and
+                    out_shape == a.shape):
                 # in-place transform possible for complex64 and complex128
                 out = a
             else:
@@ -232,7 +247,7 @@ class TestFftnPlanNd(unittest.TestCase):
                     out_dtype = np.complex64
                 else:
                     out_dtype = np.complex128
-                out = cupy.empty(a.shape,
+                out = cupy.empty(out_shape,
                                  dtype=out_dtype)
             extra_kwargs = dict(plan_type='nd', out=out)
 
@@ -252,7 +267,9 @@ class TestFftnPlanNd(unittest.TestCase):
     def test_fftn_out(self, xp, dtype):
         a = testing.shaped_random(self.shape, xp, dtype)
         if xp == cupy:
-            if a.dtype in [np.complex64, np.complex128]:
+            out_shape = self._out_shape(a.shape)
+            if (a.dtype in [np.complex64, np.complex128] and
+                    out_shape == a.shape):
                 # in-place transform possible for complex64 and complex128
                 out = a
             else:
@@ -260,7 +277,7 @@ class TestFftnPlanNd(unittest.TestCase):
                     out_dtype = np.complex64
                 else:
                     out_dtype = np.complex128
-                out = cupy.empty(a.shape,
+                out = cupy.empty(out_shape,
                                  dtype=out_dtype)
             extra_kwargs = dict(plan_type='nd', out=out)
 
@@ -280,13 +297,14 @@ class TestFftnPlanNd(unittest.TestCase):
     def test_ifftn_preplan(self, xp, dtype):
         a = testing.shaped_random(self.shape, xp, dtype)
         if xp == cupy:
+            out_shape = self._out_shape(a.shape)
             if a.dtype in [np.float16, np.float32, np.complex64]:
                 fft_type = cupy.cuda.cufft.CUFFT_C2C
             else:
                 fft_type = cupy.cuda.cufft.CUFFT_Z2Z
 
             plan = cupy.fft.get_cufft_plan_nd(
-                a.shape, fft_type=fft_type, axes=self.axes,
+                out_shape, fft_type=fft_type, axes=self.axes,
                 order='C')
 
             extra_kwargs = dict(plan_type='nd', plan=plan)
@@ -307,13 +325,14 @@ class TestFftnPlanNd(unittest.TestCase):
     def test_fftn_preplan(self, xp, dtype):
         a = testing.shaped_random(self.shape, xp, dtype)
         if xp == cupy:
+            out_shape = self._out_shape(a.shape)
             if a.dtype in [np.float16, np.float32, np.complex64]:
                 fft_type = cupy.cuda.cufft.CUFFT_C2C
             else:
                 fft_type = cupy.cuda.cufft.CUFFT_Z2Z
 
             plan = cupy.fft.get_cufft_plan_nd(
-                a.shape, fft_type=fft_type, axes=self.axes,
+                out_shape, fft_type=fft_type, axes=self.axes,
                 order='C')
 
             extra_kwargs = dict(plan_type='nd', plan=plan)
