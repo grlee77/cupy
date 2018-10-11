@@ -1,4 +1,5 @@
 from copy import copy
+from threading import get_ident
 
 import six
 
@@ -7,6 +8,7 @@ import numpy as np
 import cupy
 from cupy.cuda import cufft
 from math import sqrt
+from cupy.fft import cache
 
 
 def _convert_dtype(a, value_type):
@@ -72,8 +74,36 @@ def _exec_fft(a, direction, value_type, norm, axis, out_size=None):
     if a.base is not None:
         a = a.copy()
 
-    plan = cufft.Plan1d(a.shape[-1] if out_size is None else out_size,
-                        fft_type, a.size // a.shape[-1])
+    if out_size is None:
+        out_size = a.shape[-1]
+
+    batch = a.size // a.shape[-1]
+
+    if cache.is_enabled():
+        # CUFFT plans can only be safely used by the thread that created them
+        thread_id = get_ident()
+
+        # Note: if user-defined stream supported is added to Plan1d in the
+        # future, the stream should be added to the key as well.
+        key = (out_size, fft_type, batch, thread_id)
+
+        try:
+            if key in cache._cufft_cache:
+                plan = cache._cufft_cache.lookup(key)
+            else:
+                plan = None
+
+        except KeyError:
+            # This occurs if the object has fallen out of the cache between
+            # the check and the lookup
+            plan = None
+
+        if plan is None:
+            plan = cufft.Plan1d(out_size, fft_type, batch)
+            cache._cufft_cache.insert(plan, key)
+    else:
+        plan = cufft.Plan1d(out_size, fft_type, batch)
+
     out = plan.get_output_array(a)
     plan.fft(a, out, direction)
 
@@ -227,8 +257,8 @@ def get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
         plan_dimensions = tuple(plan_dimensions)
         if order == 'F':
             plan_dimensions = plan_dimensions[::-1]
-        inembed = np.asarray(plan_dimensions, dtype=int)
-        onembed = np.asarray(plan_dimensions, dtype=int)
+        inembed = tuple(np.asarray(plan_dimensions, dtype=int))
+        onembed = tuple(np.asarray(plan_dimensions, dtype=int))
         if 0 not in fft_axes:
             # don't FFT along the first min_axis_fft axes
             min_axis_fft = np.min(fft_axes)
@@ -267,15 +297,40 @@ def get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
                 "GPU case (Can only batch FFT over the first or last "
                 "spatial axes).")
 
-    plan = cufft.PlanNd(shape=plan_dimensions,
-                        istride=istride,
-                        ostride=ostride,
-                        inembed=inembed,
-                        onembed=onembed,
-                        idist=idist,
-                        odist=odist,
-                        fft_type=fft_type,
-                        batch=nbatch)
+    if cache.is_enabled():
+        # CUFFT plans can only be safely used by the thread that created them
+        thread_id = get_ident()
+
+        # Note: if user-defined stream supported is added to Plan1d in the
+        # future, the stream should be added to the key as well.
+        key = (shape, istride, ostride, inembed, onembed, idist, odist,
+               fft_type, nbatch, thread_id)
+
+        try:
+            if key in cache._cufft_cache:
+                plan = cache._cufft_cache.lookup(key)
+            else:
+                plan = None
+
+        except KeyError:
+            # This occurs if the object has fallen out of the cache between
+            # the check and the lookup
+            plan = None
+
+    if not cache.is_enabled() or plan is None:
+
+        plan = cufft.PlanNd(shape=plan_dimensions,
+                            istride=istride,
+                            ostride=ostride,
+                            inembed=inembed,
+                            onembed=onembed,
+                            idist=idist,
+                            odist=odist,
+                            fft_type=fft_type,
+                            batch=nbatch)
+        if cache.is_enabled():
+            cache._cufft_cache.insert(plan, key)
+
     return plan
 
 
