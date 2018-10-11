@@ -17,3 +17,4 @@ from cupy.fft.fft import rfft2  # NOQA
 from cupy.fft.fft import rfftfreq  # NOQA
 from cupy.fft.fft import rfftn  # NOQA
 from cupy.fft.fft import get_cufft_plan_nd  # NOQA
+from cupy.fft import cache  # NOQA
