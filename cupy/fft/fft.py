@@ -484,7 +484,12 @@ def fft2(a, s=None, axes=(-2, -1), norm=None):
 
     .. seealso:: :func:`numpy.fft.fft2`
     """
-    return _fft(a, s, axes, norm, cufft.CUFFT_FORWARD)
+    plan_type = _default_plan_type(a, s, axes)
+    if plan_type == 'nd':
+        func = _fftn
+    else:
+        func = _fft
+    return func(a, s, axes, norm, cufft.CUFFT_FORWARD)
 
 
 def ifft2(a, s=None, axes=(-2, -1), norm=None):
@@ -505,10 +510,42 @@ def ifft2(a, s=None, axes=(-2, -1), norm=None):
 
     .. seealso:: :func:`numpy.fft.ifft2`
     """
-    return _fft(a, s, axes, norm, cufft.CUFFT_INVERSE)
+    plan_type = _default_plan_type(a, s, axes)
+    if plan_type == 'nd':
+        func = _fftn
+    else:
+        func = _fft
+    return func(a, s, axes, norm, cufft.CUFFT_INVERSE)
 
 
-def fftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None, out=None):
+def _default_plan_type(a, s=None, axes=None):
+    ndim = a.ndim
+    if ndim == 1:
+        return '1d'
+
+    if axes is None:
+        if s is None:
+            dim = ndim
+        else:
+            dim = len(s)
+        axes = tuple([i % ndim for i in six.moves.range(-dim, 0)])
+    else:
+        # sort the provided axes in ascending order
+        axes = tuple(sorted([i % ndim for i in axes]))
+
+    if len(axes) > 3:
+        return '1d'
+    if not np.all(np.diff(sorted(axes)) == 1):
+        # use separable 1d plans when fft_axes are non-contiguous.
+        return '1d'
+    if ndim > 3 and (0 not in axes) and ((ndim - 1) not in axes):
+        # When ndim > 3, have to use separable 1d unless the first or last
+        # axis is in fft_axes.
+        return '1d'
+    return 'nd'
+
+
+def fftn(a, s=None, axes=None, norm=None, plan_type=None, plan=None, out=None):
     """Compute the N-dimensional FFT.
 
     Args:
@@ -537,6 +574,8 @@ def fftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None, out=None):
 
     .. seealso:: :func:`numpy.fft.fftn`
     """
+    if plan_type is None:
+        plan_type = _default_plan_type(a, s, axes)
     if plan_type == 'nd':
         return _fftn(a, s, axes, norm, cufft.CUFFT_FORWARD, plan=plan, out=out)
     else:
@@ -549,7 +588,7 @@ def fftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None, out=None):
         return _fft(a, s, axes, norm, cufft.CUFFT_FORWARD)
 
 
-def ifftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None,
+def ifftn(a, s=None, axes=None, norm=None, plan_type=None, plan=None,
           out=None):
     """Compute the N-dimensional inverse FFT.
 
@@ -579,6 +618,8 @@ def ifftn(a, s=None, axes=None, norm=None, plan_type='1d', plan=None,
 
     .. seealso:: :func:`numpy.fft.ifftn`
     """
+    if plan_type is None:
+        plan_type = _default_plan_type(a, s, axes)
     if plan_type == 'nd':
         return _fftn(a, s, axes, norm, cufft.CUFFT_INVERSE, plan=plan, out=out)
     else:
