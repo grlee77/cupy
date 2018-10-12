@@ -11,20 +11,25 @@ from math import sqrt
 from cupy.fft import cache
 
 
-def _convert_dtype(a, value_type):
+def _output_dtype(a, value_type):
     if value_type != 'R2C':
         if a.dtype in [np.float16, np.float32]:
-            return a.astype(np.complex64)
+            return np.complex64
         elif a.dtype not in [np.complex64, np.complex128]:
-            return a.astype(np.complex128)
+            return np.complex128
     else:
         if a.dtype in [np.complex64, np.complex128]:
-            return a.real
+            return a.real.dtype
         elif a.dtype == np.float16:
-            return a.astype(np.float32)
+            return np.float32
         elif a.dtype not in [np.float32, np.float64]:
-            return a.astype(np.float64)
-    return a
+            return np.float64
+    return a.dtype
+
+
+def _convert_dtype(a, value_type):
+    out_dtype = _output_dtype(a, value_type)
+    return a.astype(out_dtype, copy=False)
 
 
 def _cook_shape(a, s, axes, value_type):
@@ -65,7 +70,7 @@ def _convert_fft_type(a, value_type):
         return cufft.CUFFT_Z2D
 
 
-def _exec_fft(a, direction, value_type, norm, axis, out_size=None):
+def _exec_fft(a, direction, value_type, norm, axis, out_size=None, out=None):
     fft_type = _convert_fft_type(a, value_type)
 
     if axis % a.ndim != a.ndim - 1:
@@ -104,7 +109,12 @@ def _exec_fft(a, direction, value_type, norm, axis, out_size=None):
     else:
         plan = cufft.Plan1d(out_size, fft_type, batch)
 
-    out = plan.get_output_array(a)
+    if out is None:
+        out = plan.get_output_array(a)
+    else:
+        # verify that out has the expected shape and dtype
+        plan.check_output_array(a, out)
+
     plan.fft(a, out, direction)
 
     sz = out.shape[-1]
@@ -334,17 +344,6 @@ def get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
     return plan
 
 
-def _check_output_array(a, out):
-    if out.dtype != a.dtype:
-        raise ValueError("output dtype mismatch: found {}, expected {}".format(
-            out.dtype, a.dtype))
-    if not ((out.flags.f_contiguous == a.flags.f_contiguous) and
-            (out.flags.c_contiguous == a.flags.c_contiguous)):
-        raise ValueError("output contiguity mismatch")
-    if out.shape != a.shape:
-        raise ValueError("output shape mismatch")
-
-
 def _exec_fftn(a, direction, value_type, norm, axes, order, plan=None,
                out=None):
 
@@ -372,8 +371,7 @@ def _exec_fftn(a, direction, value_type, norm, axes, order, plan=None,
     if out is None:
         out = plan.get_output_array(a, order=order)
     else:
-        if out is not a:
-            _check_output_array(a, out)
+        plan.check_output_array(a, out)
     plan.fft(a, out, direction)
 
     # normalize by the product of the shape along the transformed axes
