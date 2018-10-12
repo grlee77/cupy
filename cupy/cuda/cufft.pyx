@@ -138,24 +138,49 @@ class Plan1d(object):
         else:
             execZ2D(self.plan, a.data, out.data)
 
-    def get_output_array(self, a):
+    def _output_dtype_and_shape(self, a):
         shape = list(a.shape)
         if self.fft_type == CUFFT_C2C:
-            return cupy.empty(shape, numpy.complex64)
+            dtype = numpy.complex64
         elif self.fft_type == CUFFT_R2C:
+            dtype = numpy.complex64
             shape[-1] = shape[-1] // 2 + 1
-            return cupy.empty(shape, numpy.complex64)
         elif self.fft_type == CUFFT_C2R:
             shape[-1] = self.nx
-            return cupy.empty(shape, numpy.float32)
+            dtype = numpy.float32
         elif self.fft_type == CUFFT_Z2Z:
-            return cupy.empty(shape, numpy.complex128)
+            dtype = numpy.complex128
         elif self.fft_type == CUFFT_D2Z:
             shape[-1] = shape[-1] // 2 + 1
-            return cupy.empty(shape, numpy.complex128)
+            dtype = numpy.complex128
         else:
             shape[-1] = self.nx
-            return cupy.empty(shape, numpy.float64)
+            dtype = numpy.float64
+        return tuple(shape), dtype
+
+    def get_output_array(self, a):
+        shape, dtype = self._output_dtype_and_shape(a)
+        return cupy.empty(shape, shape)
+
+    def check_output_array(self, a, out):
+        """Verify shape and dtype of the output array.
+
+        Parameters
+        ----------
+        a : cupy.array
+            The input to the transform
+        out : cupy.array
+            The array where the output of the transform will be stored.
+        """
+        shape, dtype = self._output_dtype_and_shape(a)
+        if out.shape != shape:
+            raise ValueError(
+                ("out must have shape {}.").format(shape))
+        if out.dtype != dtype:
+            raise ValueError(
+                "out dtype mismatch: found {}, expected {}".format(
+                    out.dtype, a.dtype))
+
 
 
 class PlanNd(object):
@@ -246,6 +271,8 @@ class PlanNd(object):
             raise NotImplementedError("only C2C and Z2Z implemented")
 
     def check_output_array(self, a, out):
+        if out is a:
+            return
         if out.dtype != a.dtype:
             raise ValueError("output dtype mismatch")
         if not ((out.flags.f_contiguous == a.flags.f_contiguous) and
