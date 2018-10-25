@@ -160,7 +160,7 @@ class Plan1d(object):
 
     def get_output_array(self, a):
         shape, dtype = self._output_dtype_and_shape(a)
-        return cupy.empty(shape, shape)
+        return cupy.empty(shape, dtype)
 
     def check_output_array(self, a, out):
         """Verify shape and dtype of the output array.
@@ -180,7 +180,6 @@ class Plan1d(object):
             raise ValueError(
                 "out dtype mismatch: found {}, expected {}".format(
                     out.dtype, a.dtype))
-
 
 
 class PlanNd(object):
