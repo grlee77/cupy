@@ -360,7 +360,13 @@ def _exec_fftn(a, direction, value_type, norm, axes, order, plan=None,
     else:
         if not isinstance(plan, cufft.PlanNd):
             raise ValueError("expected plan to have type cufft.PlanNd")
-        if tuple(a.shape[ax] for ax in axes) != plan.shape:
+
+        if a.flags.f_contiguous:
+            plan_shape = tuple(a.shape[ax] for ax in axes[::-1])
+        elif a.flags.c_contiguous:
+            plan_shape = tuple(a.shape[ax] for ax in axes)
+
+        if plan_shape != plan.shape:
             raise ValueError(
                 "The CUFFT plan and a.shape do not match: "
                 "plan.shape = {}, a.shape = {}".format(plan.shape, tuple(a.shape[ax] for ax in axes)))
