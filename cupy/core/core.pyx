@@ -577,7 +577,6 @@ cdef class ndarray:
         """
         cdef int order_char = 'C'
 
-        # TODO(beam2d): Support ordering option
         if len(shape) == 1 and cpython.PySequence_Check(shape[0]):
             shape = shape[0]
 
@@ -596,16 +595,14 @@ cdef class ndarray:
         if order_char == 'C':
             return self._reshape(shape)
         else:
+            # TODO(beam2d): Support ordering option within _reshape instead
             """
-            order='F' case is equivalent to:
-                1.) reverse the order of the axes via transpose
-                2.) C-ordered reshape using shape[::-1]
-                3.) reverse the order of the axes via transpose
+            The Fortran-ordered case is equivalent to:
+                1.) reverse the axes via transpose
+                2.) C-ordered reshape using reversed shape
+                3.) reverse the axes via transpose
             """
-            out = self.transpose(range(self.ndim)[::-1])
-            out = out._reshape(shape[::-1])
-            return out.transpose(range(out.ndim)[::-1])
-
+            return self.transpose()._reshape(shape[::-1]).transpose()
 
     # TODO(okuta): Implement resize
 
