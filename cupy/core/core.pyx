@@ -567,7 +567,7 @@ cdef class ndarray:
         newarray._set_shape_and_strides(shape, strides, False, True)
         return newarray
 
-    def reshape(self, *shape):
+    def reshape(self, *shape, **kwargs):
         """Returns an array of a different shape and the same content.
 
         .. seealso::
@@ -575,10 +575,37 @@ cdef class ndarray:
            :meth:`numpy.ndarray.reshape`
 
         """
+        cdef int order_char = 'C'
+
         # TODO(beam2d): Support ordering option
         if len(shape) == 1 and cpython.PySequence_Check(shape[0]):
             shape = shape[0]
-        return self._reshape(shape)
+
+        if 'order' in kwargs:
+            if kwargs['order'] == 'A':
+                if self.flags.f_contiguous:
+                    order_char = 'F'
+                else:
+                    order_char = 'C'
+            elif kwargs['order'] == 'F':
+                order_char = 'F'
+            elif kwargs['order'] != 'C':
+                raise ValueError(
+                    "order '{}' is not permitted for reshaping".format(
+                        kwargs['order']))
+        if order_char == 'C':
+            return self._reshape(shape)
+        else:
+            """
+            order='F' case is equivalent to:
+                1.) reverse the order of the axes via transpose
+                2.) C-ordered reshape using shape[::-1]
+                3.) reverse the order of the axes via transpose
+            """
+            out = self.transpose(range(self.ndim)[::-1])
+            out = out._reshape(shape[::-1])
+            return out.transpose(range(out.ndim)[::-1])
+
 
     # TODO(okuta): Implement resize
 
