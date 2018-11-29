@@ -69,100 +69,60 @@ class TestBasic(unittest.TestCase):
         del a
         cupy.get_default_memory_pool().free_all_blocks()
 
+    @testing.for_orders('CFAK')
     @testing.for_all_dtypes()
     @testing.numpy_cupy_array_equal()
-    def test_empty_like(self, xp, dtype):
+    def test_empty_like(self, xp, dtype, order):
         a = testing.shaped_arange((2, 3, 4), xp, dtype)
-        b = xp.empty_like(a)
+        b = xp.empty_like(a, order=order)
         b.fill(0)
         return b
 
+    @testing.for_orders('CFAK')
     @testing.for_all_dtypes()
     @testing.numpy_cupy_array_equal()
-    def test_empty_like_C_order(self, xp, dtype):
+    def test_empty_like_contiguity(self, xp, dtype, order):
         a = testing.shaped_arange((2, 3, 4), xp, dtype)
-        a = xp.asfortranarray(a)
-        b = xp.empty_like(a, order='C')
+        b = xp.empty_like(a, order=order)
         b.fill(0)
-        self.assertTrue(b.flags.c_contiguous)
+        if order in ['f', 'F']:
+            self.assertTrue(b.flags.f_contiguous)
+        else:
+            self.assertTrue(b.flags.c_contiguous)
         return b
 
+    @testing.for_orders('CFAK')
     @testing.for_all_dtypes()
     @testing.numpy_cupy_array_equal()
-    def test_empty_like_lowercase(self, xp, dtype):
-        a = testing.shaped_arange((2, 3, 4), xp, dtype)
-        a = xp.asfortranarray(a)
-        b = xp.empty_like(a, order='c')
-        b.fill(0)
-        self.assertTrue(b.flags.c_contiguous)
-        return b
-
-    @testing.for_all_dtypes()
-    @testing.numpy_cupy_array_equal()
-    def test_empty_like_F_order(self, xp, dtype):
-        a = testing.shaped_arange((2, 3, 4), xp, dtype)
-        b = xp.empty_like(a, order='F')
-        b.fill(0)
-        self.assertTrue(b.flags.f_contiguous)
-        return b
-
-    @testing.for_all_dtypes()
-    @testing.numpy_cupy_array_equal()
-    def test_empty_like_A_order(self, xp, dtype):
-        a = testing.shaped_arange((2, 3, 4), xp, dtype)
-        b = xp.empty_like(a, order='A')
-        b.fill(0)
-        self.assertTrue(b.flags.c_contiguous)
-        return b
-
-    @testing.for_all_dtypes()
-    @testing.numpy_cupy_array_equal()
-    def test_empty_like_A_order2(self, xp, dtype):
+    def test_empty_like_contiguity2(self, xp, dtype, order):
         a = testing.shaped_arange((2, 3, 4), xp, dtype)
         a = xp.asfortranarray(a)
-        b = xp.empty_like(a, order='A')
+        b = xp.empty_like(a, order=order)
         b.fill(0)
-        self.assertTrue(b.flags.f_contiguous)
+        if order in ['c', 'C']:
+            self.assertTrue(b.flags.c_contiguous)
+        else:
+            self.assertTrue(b.flags.f_contiguous)
         return b
 
+    @testing.for_orders('CFAK')
     @testing.for_all_dtypes()
     @testing.numpy_cupy_array_equal()
-    def test_empty_like_A_order3(self, xp, dtype):
-        a = testing.shaped_arange((2, 3, 4), xp, dtype)
-        b = xp.empty_like(a[:, ::2, :], order='A')
-        b.fill(0)
-        self.assertTrue(b.flags.c_contiguous)
-        return b
-
-    @testing.for_all_dtypes()
-    @testing.numpy_cupy_array_equal()
-    def test_empty_like_K_order(self, xp, dtype):
-        a = testing.shaped_arange((2, 3, 4), xp, dtype)
-        b = xp.empty_like(a, order='K')
-        b.fill(0)
-        self.assertTrue(b.flags.c_contiguous)
-        return b
-
-    @testing.for_all_dtypes()
-    @testing.numpy_cupy_array_equal()
-    def test_empty_like_K_order2(self, xp, dtype):
-        a = testing.shaped_arange((2, 3, 4), xp, dtype)
-        a = xp.asfortranarray(a)
-        b = xp.empty_like(a, order='K')
-        b.fill(0)
-        self.assertTrue(b.flags.f_contiguous)
-        return b
-
-    @testing.for_all_dtypes()
-    @testing.numpy_cupy_array_equal()
-    def test_empty_like_K_order3(self, xp, dtype):
+    def test_empty_like_contiguity3(self, xp, dtype, order):
         a = testing.shaped_arange((2, 3, 4), xp, dtype)
         # test strides that are both non-contiguous and non-descending
         a = a[:, ::2, :].swapaxes(0, 1)
-        b = xp.empty_like(a, order='K')
+        b = xp.empty_like(a, order=order)
         b.fill(0)
-        self.assertFalse(b.flags.c_contiguous)
-        self.assertFalse(b.flags.f_contiguous)
+        if order in ['k', 'K', None]:
+            self.assertFalse(b.flags.c_contiguous)
+            self.assertFalse(b.flags.f_contiguous)
+        elif order in ['f', 'F']:
+            self.assertFalse(b.flags.c_contiguous)
+            self.assertTrue(b.flags.f_contiguous)
+        else:
+            self.assertTrue(b.flags.c_contiguous)
+            self.assertFalse(b.flags.f_contiguous)
         return b
 
     @testing.for_all_dtypes()
@@ -229,22 +189,24 @@ class TestBasic(unittest.TestCase):
         b = cupy.zeros((2, 3), dtype='d', order=order)
         self.assertEqual(b.strides, a.strides)
 
+    @testing.for_orders('CFAK')
     @testing.for_all_dtypes()
     @testing.numpy_cupy_array_equal()
-    def test_zeros_like(self, xp, dtype):
+    def test_zeros_like(self, xp, dtype, order):
         a = xp.ndarray((2, 3, 4), dtype=dtype)
-        return xp.zeros_like(a)
+        return xp.zeros_like(a, order=order)
 
     @testing.for_all_dtypes()
     @testing.numpy_cupy_array_equal()
     def test_ones(self, xp, dtype):
         return xp.ones((2, 3, 4), dtype=dtype)
 
+    @testing.for_orders('CFAK')
     @testing.for_all_dtypes()
     @testing.numpy_cupy_array_equal()
-    def test_ones_like(self, xp, dtype):
+    def test_ones_like(self, xp, dtype, order):
         a = xp.ndarray((2, 3, 4), dtype=dtype)
-        return xp.ones_like(a)
+        return xp.ones_like(a, order=order)
 
     @testing.for_all_dtypes()
     @testing.numpy_cupy_array_equal()
@@ -263,8 +225,9 @@ class TestBasic(unittest.TestCase):
     def test_full_default_dtype_cpu_input(self, xp, dtype):
         return xp.full((2, 3, 4), numpy.array(1, dtype=dtype))
 
+    @testing.for_orders('CFAK')
     @testing.for_all_dtypes()
     @testing.numpy_cupy_array_equal()
-    def test_full_like(self, xp, dtype):
+    def test_full_like(self, xp, dtype, order):
         a = xp.ndarray((2, 3, 4), dtype=dtype)
-        return xp.full_like(a, 1)
+        return xp.full_like(a, 1, order=order)
