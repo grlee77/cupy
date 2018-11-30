@@ -159,6 +159,8 @@ def meshgrid(*xi, **kwargs):
             of a grid.
         indexing ({'xy', 'ij'}, optional): Cartesian ('xy', default) or
             matrix ('ij') indexing of output.
+        sparse (bool, optional): If ``True`` a sparse grid is returned in order
+            to conserve memory. Default is False.
         copy (bool, optional): If ``False``, a view
             into the original arrays are returned. Default is True.
 
@@ -171,6 +173,7 @@ def meshgrid(*xi, **kwargs):
 
     indexing = kwargs.pop('indexing', 'xy')
     copy = bool(kwargs.pop('copy', True))
+    sparse = bool(kwargs.pop('sparse', False))
     if kwargs:
         raise TypeError(
             'meshgrid() got an unexpected keyword argument \'{}\''.format(
@@ -199,7 +202,11 @@ def meshgrid(*xi, **kwargs):
                          (slice(None),) +
                          (None,) * (len(xi) - (left_none + 1)))
         meshes.append(x[expand_slices])
-    meshes_br = list(cupy.broadcast_arrays(*meshes))
+
+    if sparse:
+        meshes_br = meshes
+    else:
+        meshes_br = list(cupy.broadcast_arrays(*meshes))
 
     if copy:
         for i in range(len(meshes_br)):
