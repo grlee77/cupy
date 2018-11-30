@@ -152,7 +152,6 @@ def meshgrid(*xi, **kwargs):
     if indexing='xy'.
 
     Unlike NumPy, CuPy currently only supports 1-D arrays as inputs.
-    Also, CuPy does not support ``sparse`` option yet.
 
     Args:
         xi (tuple of ndarrays): 1-D arrays representing the coordinates
