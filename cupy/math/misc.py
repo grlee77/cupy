@@ -222,6 +222,8 @@ def diff(a, n=1, axis=-1):
     the given axis, higher differences are calculated by using `diff`
     recursively.
 
+    It does not have ``datetime64`` support.
+
     Args:
         a (array_like): Input array
         n (int, optional):
@@ -230,15 +232,13 @@ def diff(a, n=1, axis=-1):
         axis (int, optional):
             The axis along which the difference is taken, default is the last
             axis.
-
     Returns:
         diff (ndarray):
             The n-th differences. The shape of the output is the same as `a`
             except along `axis` where the dimension is smaller by `n`. The
             type of the output is the same as the type of the difference
             between any two elements of `a`. This is the same as the type of
-            `a` in most cases. A notable exception is `datetime64`, which
-            results in a `timedelta64` output array.
+            `a` in most cases.
 
     .. seealso:: :func:`numpy.diff`
     """
