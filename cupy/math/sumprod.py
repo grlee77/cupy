@@ -56,12 +56,8 @@ def prod(a, axis=None, dtype=None, out=None, keepdims=False):
 
     """
     # TODO(okuta): check type
-<<<<<<< HEAD
     a = cupy.asarray(a)
-    return a.prod(axis, dtype, out, keepdims)
-=======
     return _prod(a, axis=axis, dtype=dtype, out=out, keepdims=keepdims)
->>>>>>> cupy.diff
 
 
 # TODO(okuta): Implement nansum
