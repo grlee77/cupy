@@ -545,6 +545,7 @@ from cupy.math.misc import absolute as abs  # NOQA
 from cupy.math.misc import absolute  # NOQA
 from cupy.math.misc import cbrt  # NOQA
 from cupy.math.misc import clip  # NOQA
+from cupy.math.misc import diff  # NOQA
 from cupy.math.misc import fmax  # NOQA
 from cupy.math.misc import fmin  # NOQA
 from cupy.math.misc import maximum  # NOQA

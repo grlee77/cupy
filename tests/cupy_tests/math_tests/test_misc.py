@@ -5,6 +5,8 @@ import unittest
 import numpy
 
 from cupy import testing
+import pytest
+from itertools import product
 
 
 @testing.gpu
@@ -212,3 +214,32 @@ class TestMisc(unittest.TestCase):
 
     def test_nan_to_num_inf_nan(self):
         self.check_unary_inf_nan('nan_to_num')
+
+    @testing.numpy_cupy_array_equal()
+    def test_diff_array_like(self, xp):
+        return xp.diff([1, 3, 1])
+
+    @testing.numpy_cupy_raises(accept_error=numpy.AxisError)
+    def test_diff_invalid_axis(self, xp):
+        a = testing.shaped_arange((2, 3, 4), xp)
+        return xp.diff(a, axis=3)
+
+    @testing.numpy_cupy_raises(accept_error=numpy.AxisError)
+    def test_diff_invalid_axis2(self, xp):
+        a = testing.shaped_arange((2, 3, 4), xp)
+        return xp.diff(a, axis=-4)
+
+
+@testing.parameterize(*testing.product({
+    'n': [0, 1, 2, 3],
+    'axis': [-1, -2, -3, 0, 1, 2],
+}))
+@testing.gpu
+class TestDiff(unittest.TestCase):
+
+    @testing.for_all_dtypes()
+    @testing.numpy_cupy_array_equal()
+    def test_diff(self, xp, dtype):
+        a = testing.shaped_arange((2, 3, 4), xp, dtype)
+        return xp.diff(a, self.n, self.axis)
+
