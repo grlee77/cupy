@@ -227,6 +227,14 @@ cudaError_t cudaDeviceEnablePeerAccess(...) {
     return cudaSuccess;
 }
 
+cudaError_t cudaDeviceSetCacheConfig(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaDeviceGetCacheConfig(...) {
+    return cudaSuccess;
+}
+
 
 // Memory management
 cudaError_t cudaMalloc(...) {

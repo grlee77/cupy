@@ -32,6 +32,7 @@ cdef extern from *:
     ctypedef int DeviceAttr 'enum cudaDeviceAttr'
     ctypedef int MemoryAdvise 'enum cudaMemoryAdvise'
     ctypedef int MemoryKind 'enum cudaMemcpyKind'
+    ctypedef int FuncCache 'enum cudaFuncCache'
 
     ctypedef void StreamCallbackDef(
         driver.Stream stream, Error status, void* userData)
@@ -66,6 +67,10 @@ cdef extern from "cupy_cuda.h" nogil:
     int cudaDeviceCanAccessPeer(int* canAccessPeer, int device,
                                 int peerDevice)
     int cudaDeviceEnablePeerAccess(int peerDevice, unsigned int flags)
+
+    int cudaDeviceSetCacheConfig(FuncCache cacheConfig)
+    int cudaDeviceGetCacheConfig(FuncCache* pCacheConfig)
+    # int cudaFuncSetCacheConfig(const void* func, FuncCache cacheConfig)
 
     # Memory management
     int cudaMalloc(void** devPtr, size_t size)
@@ -201,6 +206,19 @@ cpdef int deviceCanAccessPeer(int device, int peerDevice) except? -1:
 cpdef deviceEnablePeerAccess(int peerDevice):
     status = cudaDeviceEnablePeerAccess(peerDevice, 0)
     check_status(status)
+
+
+cpdef int deviceGetCacheConfig() except? -1:
+    cpdef int pCacheConfig
+    status = cudaDeviceGetCacheConfig(<FuncCache*>&pCacheConfig)
+    check_status(status)
+    return pCacheConfig
+
+
+cpdef deviceSetCacheConfig(int cacheConfig):
+    status = cudaDeviceSetCacheConfig(<FuncCache>cacheConfig)
+    check_status(status)
+
 
 
 ###############################################################################

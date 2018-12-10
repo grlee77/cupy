@@ -68,6 +68,12 @@ cpdef enum:
     errorMemoryAllocation = 2
 
 
+    cudaFuncCachePreferNone = 0
+    cudaFuncCachePreferShared = 1
+    cudaFuncCachePreferL1 = 2
+    cudaFuncCachePreferEqual = 3
+
+
 ###############################################################################
 # Error handling
 ###############################################################################
@@ -95,6 +101,9 @@ cpdef deviceSynchronize()
 
 cpdef int deviceCanAccessPeer(int device, int peerDevice) except? -1
 cpdef deviceEnablePeerAccess(int peerDevice)
+
+cpdef int deviceGetCacheConfig() except? -1
+cpdef deviceSetCacheConfig(int cacheConfig)
 
 
 ###############################################################################
