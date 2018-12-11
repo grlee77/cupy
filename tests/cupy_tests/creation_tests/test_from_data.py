@@ -75,8 +75,7 @@ class TestFromData(unittest.TestCase):
     @testing.for_all_dtypes()
     @testing.numpy_cupy_array_equal()
     def test_array_f_contiguous_input(self, xp, dtype, order):
-        a = testing.shaped_arange((2, 3, 4), xp, dtype)
-        a = xp.asfortranarray(a)
+        a = testing.shaped_arange((2, 3, 4), xp, dtype, order='F')
         b = xp.array(a, copy=False, order=order)
         return b
 
@@ -145,6 +144,16 @@ class TestFromData(unittest.TestCase):
             self.assertTrue(b.flags.f_contiguous)
         else:
             self.assertTrue(b.flags.c_contiguous)
+        return b
+
+    @testing.for_CF_orders()
+    @testing.for_all_dtypes()
+    @testing.numpy_cupy_array_equal()
+    def test_asarray_preserves_numpy_array_order(self, xp, dtype, order):
+        a_numpy = testing.shaped_arange((2, 3, 4), numpy, dtype, order)
+        b = xp.asarray(a_numpy)
+        assert b.flags.f_contiguous == a_numpy.flags.f_contiguous
+        assert b.flags.c_contiguous == a_numpy.flags.c_contiguous
         return b
 
     @testing.for_CF_orders()
