@@ -31,7 +31,8 @@ class TestFlags(unittest.TestCase):
 
 @testing.parameterize(
     *testing.product({
-        'case': ['1d', '1d_noncontig', '2d_c', '2d_f', '2d_noncontig'],
+        'order': ['C', 'F', 'non-contiguous'],
+        'shape': [(8, ), (4, 8)],
     })
 )
 class TestContiguityFlags(unittest.TestCase):
@@ -40,16 +41,10 @@ class TestContiguityFlags(unittest.TestCase):
         self.flags = None
 
     def init_flags(self, xp):
-        if self.case == '1d':
-            a = testing.shaped_arange((4, ), xp)
-        elif self.case == '1d_noncontig':
-            a = testing.shaped_arange((8, ), xp)[::2]
-        elif self.case == '2d_c':
-            a = testing.shaped_arange((4, 4), xp)
-        elif self.case == '2d_f':
-            a = xp.asfortranarray(testing.shaped_arange((4, 4), xp))
-        elif self.case == '2d_noncontig':
-            a = testing.shaped_arange((4, 8), xp)[:, ::2]
+        if self.order == 'non-contiguous':
+            a = xp.empty(self.shape)[::2]
+        else:
+            a = xp.empty(self.shape, order=self.order)
         self.flags = a.flags
 
     @testing.numpy_cupy_equal()
