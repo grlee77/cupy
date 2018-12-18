@@ -7,7 +7,6 @@ from numpy.core.multiarray import normalize_axis_index
 # TODO(okuta): Implement convolve
 
 
-@fusion._ufunc_wrapper(cupy.core.core._clip)
 def clip(a, a_min=None, a_max=None, out=None):
     """Clips the values of an array to a given interval.
 
@@ -28,6 +27,10 @@ def clip(a, a_min=None, a_max=None, out=None):
     .. seealso:: :func:`numpy.clip`
 
     """
+    if fusion._is_fusing():
+        return fusion._call_ufunc(cupy.core.core._clip,
+                                  a, a_min, a_max, out=out)
+
     # TODO(okuta): check type
     return a.clip(a_min, a_max, out=out)
 

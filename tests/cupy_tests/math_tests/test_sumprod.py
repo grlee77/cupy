@@ -27,10 +27,6 @@ class TestSumprod(unittest.TestCase):
         a = testing.shaped_arange((2, 3, 4), xp, dtype)
         return xp.sum(a)
 
-    @testing.numpy_cupy_allclose()
-    def test_external_sum_arraylike(self, xp):
-        return xp.sum((1, 2, 3))
-
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose()
     def test_sum_all2(self, xp, dtype):
@@ -161,10 +157,6 @@ class TestSumprod(unittest.TestCase):
         a = testing.shaped_arange((2, 3), xp, dtype)
         return xp.prod(a)
 
-    @testing.numpy_cupy_allclose()
-    def test_external_prod_arraylike(self, xp):
-        return xp.sum((1, 2, 3))
-
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose()
     def test_prod_axis(self, xp, dtype):
@@ -256,6 +248,12 @@ class TestCumsum(unittest.TestCase):
     def test_cumsum_arraylike(self, xp):
         return xp.cumsum((1, 2, 3))
 
+    @testing.for_float_dtypes()
+    @testing.numpy_cupy_allclose()
+    def test_cumsum_numpy_array(self, xp, dtype):
+        a_numpy = numpy.arange(8, dtype=dtype)
+        return xp.cumsum(a_numpy)
+
 
 @testing.gpu
 class TestCumprod(unittest.TestCase):
@@ -326,3 +324,9 @@ class TestCumprod(unittest.TestCase):
     @testing.numpy_cupy_allclose()
     def test_cumprod_arraylike(self, xp):
         return xp.cumprod((1, 2, 3))
+
+    @testing.for_float_dtypes()
+    @testing.numpy_cupy_allclose()
+    def test_cumprod_numpy_array(self, xp, dtype):
+        a_numpy = numpy.arange(1, 6, dtype=dtype)
+        return xp.cumprod(a_numpy)

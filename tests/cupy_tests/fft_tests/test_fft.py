@@ -9,6 +9,8 @@ from cupy.fft import config
 from cupy.fft.fft import _default_plan_type
 
 from cupy import testing
+from cupy.fft import config
+from cupy.fft.fft import _default_plan_type
 
 import six
 
@@ -51,6 +53,7 @@ def nd_planning_states(states=[True, False], name='enable_nd'):
     return decorator
 
 
+<<<<<<< HEAD
 class CachedTestCase(unittest.TestCase):
     """Enable caching of CUFFT plans during the test."""
 
@@ -62,6 +65,8 @@ class CachedTestCase(unittest.TestCase):
         cache.disable()
 
 
+=======
+>>>>>>> cufft_plan_nd
 @testing.parameterize(*testing.product({
     'n': [None, 0, 5, 10, 15],
     'shape': [(10,), (10, 10)],
@@ -98,6 +103,7 @@ class TestFft(CachedTestCase):
 
 
 @testing.gpu
+<<<<<<< HEAD
 class TestFftCacheEnableDisable(CachedTestCase):
 
     def test_cache_is_enabled(self):
@@ -105,6 +111,34 @@ class TestFftCacheEnableDisable(CachedTestCase):
 
         cache.disable()
         assert not cache.is_enabled()
+=======
+class TestDefaultPlanType(unittest.TestCase):
+
+    @nd_planning_states()
+    def test_default_plan_type(self, enable_nd):
+        # test cases where nd CUFFT plan is possible
+        ca = cupy.ones((16, 16, 16))
+        for axes in [(0, 1), (1, 2), None, (0, 1, 2)]:
+            plan_type = _default_plan_type(ca, axes=axes)
+            if enable_nd:
+                self.assertEqual(plan_type, 'nd')
+            else:
+                self.assertEqual(plan_type, '1d')
+
+        # only a single axis is transformed -> 1d plan preferred
+        for axes in [(0, ), (1, ), (2, )]:
+            self.assertEqual(_default_plan_type(ca, axes=axes), '1d')
+
+        # non-contiguous axes -> nd plan not possible
+        self.assertEqual(_default_plan_type(ca, axes=(0, 2)), '1d')
+
+        # >3 axes transformed -> nd plan not possible
+        ca = cupy.ones((2, 4, 6, 8))
+        self.assertEqual(_default_plan_type(ca), '1d')
+
+        # first or last axis not included -> nd plan not possible
+        self.assertEqual(_default_plan_type(ca, axes=(1, )), '1d')
+>>>>>>> cufft_plan_nd
 
 
 @testing.gpu
@@ -148,10 +182,12 @@ class TestFftAllocate(unittest.TestCase):
 @testing.with_requires('numpy>=1.10.0')
 class TestFft2(CachedTestCase): # unittest.TestCase):
 
+    @nd_planning_states()
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
                                  contiguous_check=False)
-    def test_fft2(self, xp, dtype):
+    def test_fft2(self, xp, dtype, enable_nd):
+        assert config.enable_nd_planning == enable_nd
         a = testing.shaped_random(self.shape, xp, dtype)
         out = xp.fft.fft2(a, s=self.s, norm=self.norm)
 
@@ -160,10 +196,12 @@ class TestFft2(CachedTestCase): # unittest.TestCase):
 
         return out
 
+    @nd_planning_states()
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
                                  contiguous_check=False)
-    def test_ifft2(self, xp, dtype):
+    def test_ifft2(self, xp, dtype, enable_nd):
+        assert config.enable_nd_planning == enable_nd
         a = testing.shaped_random(self.shape, xp, dtype)
         out = xp.fft.ifft2(a, s=self.s, norm=self.norm)
 
@@ -186,6 +224,7 @@ class TestFft2(CachedTestCase): # unittest.TestCase):
     {'shape': (2, 3, 4), 's': (1, 4, 10), 'axes': None, 'norm': None},
     {'shape': (2, 3, 4), 's': None, 'axes': (-3, -2, -1), 'norm': None},
     {'shape': (2, 3, 4), 's': None, 'axes': (-1, -2, -3), 'norm': None},
+    {'shape': (2, 3, 4), 's': None, 'axes': (-1, -3), 'norm': None},
     {'shape': (2, 3, 4), 's': None, 'axes': (0, 1), 'norm': None},
     {'shape': (2, 3, 4), 's': None, 'axes': None, 'norm': 'ortho'},
     {'shape': (2, 3, 4), 's': (2, 3), 'axes': (0, 1, 2), 'norm': 'ortho'},
@@ -195,10 +234,12 @@ class TestFft2(CachedTestCase): # unittest.TestCase):
 @testing.with_requires('numpy>=1.10.0')
 class TestFftn(CachedTestCase):
 
+    @nd_planning_states()
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
                                  contiguous_check=False)
-    def test_fftn(self, xp, dtype):
+    def test_fftn(self, xp, dtype, enable_nd):
+        assert config.enable_nd_planning == enable_nd
         a = testing.shaped_random(self.shape, xp, dtype)
         out = xp.fft.fftn(a, s=self.s, axes=self.axes, norm=self.norm)
 
@@ -207,10 +248,12 @@ class TestFftn(CachedTestCase):
 
         return out
 
+    @nd_planning_states()
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
                                  contiguous_check=False)
-    def test_ifftn(self, xp, dtype):
+    def test_ifftn(self, xp, dtype, enable_nd):
+        assert config.enable_nd_planning == enable_nd
         a = testing.shaped_random(self.shape, xp, dtype)
         out = xp.fft.ifftn(a, s=self.s, axes=self.axes, norm=self.norm)
 
@@ -222,6 +265,7 @@ class TestFftn(CachedTestCase):
 
 @testing.parameterize(
     {'shape': (3, 4), 's': None, 'axes': None, 'norm': None},
+<<<<<<< HEAD
     {'shape': (3, 4), 's': (1, None), 'axes': None, 'norm': None},
     {'shape': (3, 4), 's': (1, 5), 'axes': None, 'norm': None},
     {'shape': (3, 4), 's': None, 'axes': (-2, -1), 'norm': None},
@@ -413,6 +457,8 @@ class TestFftnPlanNd(unittest.TestCase):
 
 @testing.parameterize(
     {'shape': (3, 4), 's': None, 'axes': None, 'norm': None},
+=======
+>>>>>>> cufft_plan_nd
     {'shape': (3, 4), 's': None, 'axes': (-2, -1), 'norm': None},
     {'shape': (3, 4), 's': None, 'axes': (-1, -2), 'norm': None},
     {'shape': (3, 4), 's': None, 'axes': (0,), 'norm': None},
