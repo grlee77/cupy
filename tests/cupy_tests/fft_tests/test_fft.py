@@ -9,8 +9,6 @@ from cupy.fft import config
 from cupy.fft.fft import _default_plan_type
 
 from cupy import testing
-from cupy.fft import config
-from cupy.fft.fft import _default_plan_type
 
 import six
 
@@ -53,7 +51,6 @@ def nd_planning_states(states=[True, False], name='enable_nd'):
     return decorator
 
 
-<<<<<<< HEAD
 class CachedTestCase(unittest.TestCase):
     """Enable caching of CUFFT plans during the test."""
 
@@ -65,8 +62,6 @@ class CachedTestCase(unittest.TestCase):
         cache.disable()
 
 
-=======
->>>>>>> cufft_plan_nd
 @testing.parameterize(*testing.product({
     'n': [None, 0, 5, 10, 15],
     'shape': [(10,), (10, 10)],
@@ -103,7 +98,6 @@ class TestFft(CachedTestCase):
 
 
 @testing.gpu
-<<<<<<< HEAD
 class TestFftCacheEnableDisable(CachedTestCase):
 
     def test_cache_is_enabled(self):
@@ -111,7 +105,9 @@ class TestFftCacheEnableDisable(CachedTestCase):
 
         cache.disable()
         assert not cache.is_enabled()
-=======
+
+
+@testing.gpu
 class TestDefaultPlanType(unittest.TestCase):
 
     @nd_planning_states()
@@ -127,6 +123,7 @@ class TestDefaultPlanType(unittest.TestCase):
 
         # only a single axis is transformed -> 1d plan preferred
         for axes in [(0, ), (1, ), (2, )]:
+            print(_default_plan_type(ca, axes=axes))
             self.assertEqual(_default_plan_type(ca, axes=axes), '1d')
 
         # non-contiguous axes -> nd plan not possible
@@ -138,7 +135,6 @@ class TestDefaultPlanType(unittest.TestCase):
 
         # first or last axis not included -> nd plan not possible
         self.assertEqual(_default_plan_type(ca, axes=(1, )), '1d')
->>>>>>> cufft_plan_nd
 
 
 @testing.gpu
@@ -180,7 +176,7 @@ class TestFftAllocate(unittest.TestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestFft2(CachedTestCase): # unittest.TestCase):
+class TestFft2(CachedTestCase):  # unittest.TestCase):
 
     @nd_planning_states()
     @testing.for_all_dtypes()
@@ -265,7 +261,6 @@ class TestFftn(CachedTestCase):
 
 @testing.parameterize(
     {'shape': (3, 4), 's': None, 'axes': None, 'norm': None},
-<<<<<<< HEAD
     {'shape': (3, 4), 's': (1, None), 'axes': None, 'norm': None},
     {'shape': (3, 4), 's': (1, 5), 'axes': None, 'norm': None},
     {'shape': (3, 4), 's': None, 'axes': (-2, -1), 'norm': None},
@@ -457,8 +452,6 @@ class TestFftnPlanNd(unittest.TestCase):
 
 @testing.parameterize(
     {'shape': (3, 4), 's': None, 'axes': None, 'norm': None},
-=======
->>>>>>> cufft_plan_nd
     {'shape': (3, 4), 's': None, 'axes': (-2, -1), 'norm': None},
     {'shape': (3, 4), 's': None, 'axes': (-1, -2), 'norm': None},
     {'shape': (3, 4), 's': None, 'axes': (0,), 'norm': None},
@@ -472,7 +465,7 @@ class TestFftnPlanNd(unittest.TestCase):
     {'shape': (2, 3, 4, 5), 's': None, 'axes': (-3, -2, -1), 'norm': None},
 )
 @testing.gpu
-class TestFftnContiguity(unittest.TestCase):
+class TestFftnContiguity(unittest.TestCase):  # use CachedTestCase?
 
     @nd_planning_states([True])
     @testing.for_all_dtypes()

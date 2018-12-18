@@ -457,9 +457,9 @@ def _default_plan_type(a, s=None, axes=None):
         axes = tuple(sorted([i % ndim for i in axes]))
 
     if len(axes) == 1:
-        # use Plan1d to transform a  single axis
+        # use Plan1d to transform a single axis
         return '1d'
-    if len(axes) > 3 or not (np.all(np.diff(sorted(axes)) == 1)):
+    elif len(axes) > 3 or not np.all(np.diff(axes) == 1):
         # PlanNd supports 1d, 2d or 3d transforms over contiguous axes
         return '1d'
     if (0 not in axes) and ((ndim - 1) not in axes):
@@ -560,33 +560,6 @@ def ifft2(a, s=None, axes=(-2, -1), norm=None):
     """
     func = _default_fft_func(a, s, axes)
     return func(a, s, axes, norm, cufft.CUFFT_INVERSE)
-
-
-def _default_plan_type(a, s=None, axes=None):
-    ndim = a.ndim
-    if ndim == 1:
-        return '1d'
-
-    if axes is None:
-        if s is None:
-            dim = ndim
-        else:
-            dim = len(s)
-        axes = tuple([i % ndim for i in six.moves.range(-dim, 0)])
-    else:
-        # sort the provided axes in ascending order
-        axes = tuple(sorted([i % ndim for i in axes]))
-
-    if len(axes) > 3:
-        return '1d'
-    if not np.all(np.diff(sorted(axes)) == 1):
-        # use separable 1d plans when fft_axes are non-contiguous.
-        return '1d'
-    if ndim > 3 and (0 not in axes) and ((ndim - 1) not in axes):
-        # When ndim > 3, have to use separable 1d unless the first or last
-        # axis is in fft_axes.
-        return '1d'
-    return 'nd'
 
 
 def fftn(a, s=None, axes=None, norm=None, plan_type=None, plan=None, out=None):
