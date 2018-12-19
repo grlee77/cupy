@@ -67,9 +67,12 @@ def unique(ar, return_index=False, return_inverse=False,
     else:
         ar.sort()
         aux = ar
-    mask = cupy.empty(aux.shape, dtype=cupy.bool_)
-    mask[0] = True
-    mask[1:] = aux[1:] != aux[:-1]
+    if ar.size > 0:
+        mask = cupy.empty(aux.shape, dtype=cupy.bool_)
+        mask[0] = True
+        mask[1:] = aux[1:] != aux[:-1]
+    else:
+        mask = cupy.asarray([], dtype=cupy.bool_)
 
     ret = aux[mask]
     if not return_index and not return_inverse and not return_counts:
