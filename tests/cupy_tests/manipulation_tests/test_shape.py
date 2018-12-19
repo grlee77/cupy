@@ -41,12 +41,6 @@ class TestShape(unittest.TestCase):
 
     @testing.for_orders('CFA')
     @testing.numpy_cupy_array_equal()
-    def test_transposed_reshape(self, xp, order):
-        a = testing.shaped_arange((2, 3, 4), xp).T
-        return a.reshape(4, 6, order=order)
-
-    @testing.for_orders('CFA')
-    @testing.numpy_cupy_array_equal()
     def test_transposed_reshape2(self, xp, order):
         a = testing.shaped_arange((2, 3, 4), xp).transpose(2, 0, 1)
         return a.reshape(2, 3, 4, order=order)
@@ -117,11 +111,13 @@ class TestReshapeOrder(unittest.TestCase):
 
     def test_reshape_contiguity(self):
         shape_init, shape_final = self.shape_in_out
-        a_cupy = testing.shaped_arange(shape_init, xp=cupy,
-                                       order=self.order_init)
+
+        a_cupy = testing.shaped_arange(shape_init, xp=cupy)
+        a_cupy = cupy.asarray(a_cupy, order=self.order_init)
         b_cupy = a_cupy.reshape(shape_final, order=self.order_reshape)
-        a_numpy = testing.shaped_arange(shape_init, xp=numpy,
-                                        order=self.order_init)
+
+        a_numpy = testing.shaped_arange(shape_init, xp=numpy)
+        a_numpy = numpy.asarray(a_numpy, order=self.order_init)
         b_numpy = a_numpy.reshape(shape_final, order=self.order_reshape)
 
         assert a_cupy.flags.f_contiguous == a_numpy.flags.f_contiguous
@@ -131,3 +127,4 @@ class TestReshapeOrder(unittest.TestCase):
 
         testing.assert_array_equal(a_cupy.strides, a_numpy.strides)
         testing.assert_array_equal(b_cupy.strides, b_numpy.strides)
+        testing.assert_array_equal(b_cupy, b_numpy)
