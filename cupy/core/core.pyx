@@ -568,7 +568,7 @@ cdef class ndarray:
         if 'order' in kwargs:
             order_char = _normalize_order(kwargs['order'], False)
             if order_char == 'A':
-                if self._f_contiguous:
+                if self._f_contiguous and not self._c_contiguous:
                     order_char = 'F'
                 else:
                     order_char = 'C'
@@ -704,7 +704,7 @@ cdef class ndarray:
 
         order_char = _normalize_order(order, True)
         if order_char == 'A':
-            if self._f_contiguous:
+            if self._f_contiguous and not self._c_contiguous:
                 order_char = 'F'
             else:
                 order_char = 'C'
