@@ -7,6 +7,7 @@ import numpy
 
 from cupy.cuda import compiler
 from cupy import util
+from cupy.core import _AxisError
 
 
 cpdef _get_simple_reduction_kernel(
@@ -99,11 +100,7 @@ cpdef tuple _get_axis(object axis, Py_ssize_t ndim):
 
     for dim in axis:
         if dim < -ndim or dim >= ndim:
-            try:
-                raise numpy.AxisError('Axis overrun')
-            except AttributeError:
-                # AxisError didn't exist prior to numpy 1.13
-                raise ValueError('Axis overrun')
+            raise _AxisError('Axis overrun')
     reduce_axis = tuple(sorted([dim % ndim for dim in axis]))
     out_axis = tuple([dim for dim in range(ndim) if dim not in reduce_axis])
     return reduce_axis, out_axis
