@@ -1,6 +1,5 @@
 import unittest
 
-import cupy
 from cupy.core import flags
 from cupy import testing
 
