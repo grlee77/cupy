@@ -1,6 +1,7 @@
 import unittest
 
 import numpy
+
 import cupy
 from cupy import testing
 
@@ -66,6 +67,13 @@ class TestRoll(unittest.TestCase):
     @testing.for_all_dtypes()
     @testing.with_requires('numpy>=1.12')
     @testing.numpy_cupy_array_equal()
+    def test_roll_scalar_shift_duplicate_axis(self, xp, dtype):
+        x = testing.shaped_arange((5, 2), xp, dtype)
+        return xp.roll(x, 1, axis=(0, 0))
+
+    @testing.for_all_dtypes()
+    @testing.with_requires('numpy>=1.12')
+    @testing.numpy_cupy_array_equal()
     def test_roll_large_shift(self, xp, dtype):
         x = testing.shaped_arange((5, 2), xp, dtype)
         return xp.roll(x, 50, axis=0)
@@ -105,51 +113,48 @@ class TestRoll(unittest.TestCase):
         x = testing.shaped_arange((5, 2), xp, dtype)
         return xp.roll(x, (2, 1, 3), axis=None)
 
-    @testing.numpy_cupy_raises(accept_error=TypeError)
+    @testing.numpy_cupy_raises()
     def test_roll_invalid_shift(self, xp):
         x = testing.shaped_arange((5, 2), xp)
         return xp.roll(x, '0', axis=0)
 
-    @testing.numpy_cupy_raises(accept_error=ValueError)
+    @testing.with_requires('numpy>=1.12')
+    @testing.numpy_cupy_raises()
     def test_roll_shape_mismatch(self, xp):
         x = testing.shaped_arange((5, 2, 3), xp)
         return xp.roll(x, (2, 2, 2), axis=(0, 1))
 
-    @testing.with_requires('numpy>=1.13')
-    @testing.numpy_cupy_raises(accept_error=numpy.AxisError)
-    def test_roll_invalid_axis1(self, xp, dtype):
+    @testing.numpy_cupy_raises()
+    def test_roll_invalid_axis1(self, xp):
         x = testing.shaped_arange((5, 2), xp)
         return xp.roll(x, 1, axis=2)
 
-    @testing.with_requires('numpy>=1.13')
-    @testing.numpy_cupy_raises(accept_error=numpy.AxisError)
+    @testing.numpy_cupy_raises()
     def test_roll_invalid_axis2(self, xp):
         x = testing.shaped_arange((5, 2), xp)
         return xp.roll(x, 1, axis=-3)
 
     @testing.with_requires('numpy>=1.12')
-    @testing.numpy_cupy_raises(accept_error=ValueError)
+    @testing.numpy_cupy_raises()
     def test_roll_invalid_axis_length(self, xp):
         x = testing.shaped_arange((5, 2, 2), xp)
         return cupy.roll(x, shift=(1, 0), axis=(0, 1, 2))
 
-    @testing.numpy_cupy_raises(accept_error=TypeError)
+    @testing.numpy_cupy_raises()
     def test_roll_invalid_axis_type(self, xp):
         x = testing.shaped_arange((5, 2), xp)
         return xp.roll(x, 2, axis='0')
 
-    @testing.for_all_dtypes()
-    @testing.with_requires('numpy>=1.13')
     @testing.numpy_cupy_raises()
-    def test_roll_invalid_negative_axis1(self, xp, dtype):
-        x = testing.shaped_arange((5, 2), xp, dtype)
+    def test_roll_invalid_negative_axis1(self, xp):
+        x = testing.shaped_arange((5, 2), xp)
         return xp.roll(x, 1, axis=-3)
 
-    @testing.for_all_dtypes()
-    def test_roll_invalid_negative_axis2(self, dtype):
-        x = testing.shaped_arange((5, 2), cupy, dtype)
-        with self.assertRaises(cupy.core.core._AxisError):
-            return cupy.roll(x, 1, axis=-3)
+    @testing.with_requires('numpy>=1.12')
+    @testing.numpy_cupy_raises()
+    def test_roll_invalid_negative_axis2(self, xp):
+        x = testing.shaped_arange((5, 2), xp)
+        return xp.roll(x, 1, axis=(1, -3))
 
 
 @testing.gpu
