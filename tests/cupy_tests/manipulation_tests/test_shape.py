@@ -109,6 +109,10 @@ class TestShape(unittest.TestCase):
 @testing.gpu
 class TestReshapeOrder(unittest.TestCase):
 
+<<<<<<< HEAD
+=======
+    @testing.with_requires('numpy>=1.12')
+>>>>>>> reshape_w_order
     def test_reshape_contiguity(self):
         shape_init, shape_final = self.shape_in_out
 
@@ -120,11 +124,17 @@ class TestReshapeOrder(unittest.TestCase):
         a_numpy = numpy.asarray(a_numpy, order=self.order_init)
         b_numpy = a_numpy.reshape(shape_final, order=self.order_reshape)
 
+<<<<<<< HEAD
         assert a_cupy.flags.f_contiguous == a_numpy.flags.f_contiguous
         assert a_cupy.flags.c_contiguous == a_numpy.flags.c_contiguous
         assert b_cupy.flags.f_contiguous == b_numpy.flags.f_contiguous
         assert b_cupy.flags.c_contiguous == b_numpy.flags.c_contiguous
 
         testing.assert_array_equal(a_cupy.strides, a_numpy.strides)
+=======
+        assert b_cupy.flags.f_contiguous == b_numpy.flags.f_contiguous
+        assert b_cupy.flags.c_contiguous == b_numpy.flags.c_contiguous
+
+>>>>>>> reshape_w_order
         testing.assert_array_equal(b_cupy.strides, b_numpy.strides)
         testing.assert_array_equal(b_cupy, b_numpy)
