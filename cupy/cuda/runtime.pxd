@@ -169,6 +169,7 @@ cpdef enum:
     cudaDevAttrPageableMemoryAccessUsesHostPageTables = 100
     cudaDevAttrDirectManagedMemAccessFromHost = 101
 
+
 ###############################################################################
 # Error handling
 ###############################################################################

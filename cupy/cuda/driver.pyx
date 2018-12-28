@@ -13,6 +13,23 @@ There are four differences compared to the original C API.
 """
 cimport cython  # NOQA
 
+cdef class FuncAttributes:
+
+    def __init__(self, size_t sharedSizeBytes, size_t constSizeBytes,
+                 size_t localSizeBytes, int maxThreadsPerBlock, int numRegs,
+                 int ptxVersion, int binaryVersion, int cacheModeCA,
+                 int maxDynamicSharedSizeBytes, int preferredShmemCarveout):
+        self.sharedSizeBytes = sharedSizeBytes
+        self.constSizeBytes = constSizeBytes
+        self.localSizeBytes = localSizeBytes
+        self.maxThreadsPerBlock = maxThreadsPerBlock
+        self.numRegs = numRegs
+        self.ptxVersion = ptxVersion
+        self.binaryVersion = binaryVersion
+        self.cacheModeCA = cacheModeCA
+        self.maxDynamicSharedSizeBytes = maxDynamicSharedSizeBytes
+        self.preferredShmemCarveout = preferredShmemCarveout
+
 
 ###############################################################################
 # Extern
@@ -54,6 +71,10 @@ cdef extern from "cupy_cuda.h" nogil:
         unsigned int sharedMemBytes, Stream hStream,
         void** kernelParams, void** extra)
 
+    # Kernel attributes
+    int cuFuncGetAttribute(int *pi, CUfunction_attribute attrib,
+                           Function hfunc)
+
     # Build-time version
     int CUDA_VERSION
 
@@ -78,6 +99,15 @@ class CUDADriverError(RuntimeError):
 @cython.profile(False)
 cpdef inline check_status(int status):
     if status != 0:
+        raise CUDADriverError(status)
+
+
+@cython.profile(False)
+cdef inline check_attribute_status(int status, int* pi):
+    # set attribute to -1 on older versions of CUDA where it was undefined
+    if status == CUDA_ERROR_INVALID_VALUE:
+        pi[0] = -1
+    elif status != 0:
         raise CUDADriverError(status)
 
 
@@ -226,3 +256,76 @@ cpdef launchKernel(
             shared_mem_bytes, <Stream>stream,
             <void**>kernel_params, <void**>extra)
     check_status(status)
+
+
+cpdef FuncAttributes funcGetAttributes(size_t func):
+    cdef:
+        int sharedSizeBytes, constSizeBytes, localSizeBytes
+        int maxThreadsPerBlock, numRegs, ptxVersion, binaryVersion
+        int cacheModeCA, maxDynamicSharedSizeBytes, preferredShmemCarveout
+
+    status = cuFuncGetAttribute(
+        &sharedSizeBytes,
+        <CUfunction_attribute>CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES,
+        <Function> func)
+    check_attribute_status(status, &sharedSizeBytes)
+
+    status = cuFuncGetAttribute(
+        &constSizeBytes,
+        <CUfunction_attribute>CU_FUNC_ATTRIBUTE_CONST_SIZE_BYTES,
+        <Function> func)
+    check_attribute_status(status, &constSizeBytes)
+
+    status = cuFuncGetAttribute(
+        &localSizeBytes,
+        <CUfunction_attribute>CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES,
+        <Function> func)
+    check_attribute_status(status, &localSizeBytes)
+
+    status = cuFuncGetAttribute(
+        &maxThreadsPerBlock,
+        <CUfunction_attribute>CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK,
+        <Function> func)
+    check_attribute_status(status, &maxThreadsPerBlock)
+
+    status = cuFuncGetAttribute(
+        &numRegs,
+        <CUfunction_attribute>CU_FUNC_ATTRIBUTE_NUM_REGS,
+        <Function> func)
+    check_attribute_status(status, &numRegs)
+
+    status = cuFuncGetAttribute(
+        &ptxVersion,
+        <CUfunction_attribute>CU_FUNC_ATTRIBUTE_PTX_VERSION,
+        <Function> func)
+    check_attribute_status(status, &ptxVersion)
+
+    status = cuFuncGetAttribute(
+        &binaryVersion,
+        <CUfunction_attribute>CU_FUNC_ATTRIBUTE_BINARY_VERSION,
+        <Function> func)
+    check_attribute_status(status, &binaryVersion)
+
+    status = cuFuncGetAttribute(
+        &cacheModeCA,
+        <CUfunction_attribute>CU_FUNC_ATTRIBUTE_CACHE_MODE_CA,
+        <Function> func)
+    check_attribute_status(status, &cacheModeCA)
+
+    status = cuFuncGetAttribute(
+        &maxDynamicSharedSizeBytes,
+        <CUfunction_attribute>CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+        <Function> func)
+    check_attribute_status(status, &maxDynamicSharedSizeBytes)
+
+    cdef int carveout = CU_FUNC_ATTRIBUTE_PREFERRED_SHARED_MEMORY_CARVEOUT
+    status = cuFuncGetAttribute(
+        &preferredShmemCarveout, <CUfunction_attribute>carveout,
+        <Function> func)
+    check_attribute_status(status, &preferredShmemCarveout)
+
+    return FuncAttributes(
+        <size_t> sharedSizeBytes, <size_t> constSizeBytes,
+        <size_t> localSizeBytes, maxThreadsPerBlock, numRegs, ptxVersion,
+        binaryVersion, cacheModeCA, maxDynamicSharedSizeBytes,
+        preferredShmemCarveout)

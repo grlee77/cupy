@@ -10,7 +10,7 @@ from cupy import testing
     *testing.product({
         'array': [numpy.arange(6).reshape([2, 3])],
         'pad_width': [1, [1, 2], [[1, 2], [3, 4]]],
-        'mode': ['constant', 'edge', 'reflect'],
+        'mode': ['constant', 'edge', 'reflect', 'symmetric', 'wrap'],
     })
 )
 @testing.gpu
@@ -51,6 +51,21 @@ class TestPadDefault(unittest.TestCase):
     {'array': numpy.arange(6).reshape([2, 3]),
      'pad_width': [[1, 2], [3, 4]], 'mode': 'reflect',
      'reflect_type': 'odd'},
+    # mode='symmetric'
+    {'array': numpy.arange(6).reshape([2, 3]), 'pad_width': 1,
+     'mode': 'symmetric', 'reflect_type': 'odd'},
+    {'array': numpy.arange(6).reshape([2, 3]),
+     'pad_width': [1, 2], 'mode': 'symmetric', 'reflect_type': 'odd'},
+    {'array': numpy.arange(6).reshape([2, 3]),
+     'pad_width': [[1, 2], [3, 4]], 'mode': 'symmetric',
+     'reflect_type': 'odd'},
+    # mode='wrap'
+    {'array': numpy.arange(6).reshape([2, 3]), 'pad_width': 1,
+     'mode': 'wrap'},
+    {'array': numpy.arange(6).reshape([2, 3]),
+     'pad_width': [1, 2], 'mode': 'wrap'},
+    {'array': numpy.arange(6).reshape([2, 3]),
+     'pad_width': [[1, 2], [3, 4]], 'mode': 'wrap'},
 )
 @testing.gpu
 # Old numpy does not work with multi-dimensional constant_values
@@ -67,9 +82,11 @@ class TestPad(unittest.TestCase):
             if self.mode == 'constant':
                 return xp.pad(array, self.pad_width, mode=self.mode,
                               constant_values=self.constant_values)
-            elif self.mode == 'reflect':
+            elif self.mode in ['reflect', 'symmetric']:
                 return xp.pad(array, self.pad_width, mode=self.mode,
                               reflect_type=self.reflect_type)
+            elif self.mode in ['wrap']:
+                return xp.pad(array, self.pad_width, mode=self.mode)
 
         if xp is numpy:
             with warnings.catch_warnings():
@@ -110,6 +127,14 @@ class TestPadNumpybug(unittest.TestCase):
     {'array': 1, 'pad_width': 1, 'mode': 'reflect'},
     {'array': [0, 1, 2, 3], 'pad_width': 1, 'mode': 'reflect'},
     {'array': [0, 1, 2, 3], 'pad_width': [1, 2], 'mode': 'reflect'},
+    # mode='symmetric'
+    {'array': 1, 'pad_width': 1, 'mode': 'symmetric'},
+    {'array': [0, 1, 2, 3], 'pad_width': 1, 'mode': 'symmetric'},
+    {'array': [0, 1, 2, 3], 'pad_width': [1, 2], 'mode': 'symmetric'},
+    # mode='wrap'
+    {'array': 1, 'pad_width': 1, 'mode': 'wrap'},
+    {'array': [0, 1, 2, 3], 'pad_width': 1, 'mode': 'wrap'},
+    {'array': [0, 1, 2, 3], 'pad_width': [1, 2], 'mode': 'wrap'},
 )
 @testing.gpu
 class TestPadSpecial(unittest.TestCase):
@@ -119,7 +144,7 @@ class TestPadSpecial(unittest.TestCase):
         if self.mode == 'constant':
             a = xp.pad(self.array, self.pad_width, mode=self.mode,
                        constant_values=self.constant_values)
-        elif self.mode in ['edge', 'reflect']:
+        elif self.mode in ['edge', 'reflect', 'symmetric', 'wrap']:
             a = xp.pad(self.array, self.pad_width, mode=self.mode)
         return a
 
@@ -146,6 +171,21 @@ class TestPadSpecial(unittest.TestCase):
     {'array': [0, 1, 2, 3], 'pad_width': [], 'mode': 'reflect'},
     {'array': [0, 1, 2, 3], 'pad_width': [[3, 4], [5, 6]], 'mode': 'reflect'},
     {'array': [0, 1, 2, 3], 'pad_width': [1], 'mode': 'reflect',
+     'notallowedkeyword': 3},
+    # mode='symmetric'
+    {'array': [], 'pad_width': 1, 'mode': 'symmetric'},
+    {'array': [0, 1, 2, 3], 'pad_width': [-1, 1], 'mode': 'symmetric'},
+    {'array': [0, 1, 2, 3], 'pad_width': [], 'mode': 'symmetric'},
+    {'array': [0, 1, 2, 3], 'pad_width': [[3, 4], [5, 6]], 'mode':
+     'symmetric'},
+    {'array': [0, 1, 2, 3], 'pad_width': [1], 'mode': 'symmetric',
+     'notallowedkeyword': 3},
+    # mode='wrap'
+    {'array': [], 'pad_width': 1, 'mode': 'wrap'},
+    {'array': [0, 1, 2, 3], 'pad_width': [-1, 1], 'mode': 'wrap'},
+    {'array': [0, 1, 2, 3], 'pad_width': [], 'mode': 'wrap'},
+    {'array': [0, 1, 2, 3], 'pad_width': [[3, 4], [5, 6]], 'mode': 'wrap'},
+    {'array': [0, 1, 2, 3], 'pad_width': [1], 'mode': 'wrap',
      'notallowedkeyword': 3},
 )
 @testing.gpu

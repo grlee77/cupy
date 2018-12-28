@@ -28,6 +28,7 @@ from cupy.cuda.runtime import CUDARuntimeError
 cimport cpython  # NOQA
 cimport cython  # NOQA
 from libcpp cimport vector
+from libcpp cimport bool as cpp_bool
 
 from cupy.core cimport _dtype
 from cupy.core._dtype cimport get_dtype
@@ -66,10 +67,10 @@ except AttributeError:
 
 
 @cython.profile(False)
-cdef inline int _normalize_order(order) except? 0:
+cdef inline int _normalize_order(order, cpp_bool allow_k=True) except? 0:
     cdef int order_char
     order_char = 'C' if len(order) == 0 else ord(order[0])
-    if order_char == 'K' or order_char == 'k':
+    if allow_k and (order_char == 'K' or order_char == 'k'):
         order_char = 'K'
     elif order_char == 'A' or order_char == 'a':
         order_char = 'A'
@@ -551,7 +552,7 @@ cdef class ndarray:
         newarray._set_shape_and_strides(shape, strides, False, True)
         return newarray
 
-    def reshape(self, *shape):
+    def reshape(self, *shape, order='C'):
         """Returns an array of a different shape and the same content.
 
         .. seealso::
@@ -559,10 +560,26 @@ cdef class ndarray:
            :meth:`numpy.ndarray.reshape`
 
         """
-        # TODO(beam2d): Support ordering option
+        cdef int order_char = _normalize_order(order, False)
+
         if len(shape) == 1 and cpython.PySequence_Check(shape[0]):
             shape = shape[0]
-        return self._reshape(shape)
+
+        if order_char == 'A':
+            if self._f_contiguous and not self._c_contiguous:
+                order_char = 'F'
+            else:
+                order_char = 'C'
+        if order_char == 'C':
+            return self._reshape(shape)
+        else:
+            # TODO(grlee77): Support order within _reshape instead
+
+            # The Fortran-ordered case is equivalent to:
+            #     1.) reverse the axes via transpose
+            #     2.) C-ordered reshape using reversed shape
+            #     3.) reverse the axes via transpose
+            return self.transpose()._reshape(shape[::-1]).transpose()
 
     # TODO(okuta): Implement resize
 
@@ -669,7 +686,7 @@ cdef class ndarray:
         newarray._f_contiguous = True
         return newarray
 
-    cpdef ndarray ravel(self):
+    cpdef ndarray ravel(self, order='C'):
         """Returns an array flattened into one dimension.
 
         .. seealso::
@@ -677,10 +694,24 @@ cdef class ndarray:
            :meth:`numpy.ndarray.ravel`
 
         """
-        # TODO(beam2d): Support ordering option
+        # TODO(beam2d, grlee77): Support K ordering option
+        cdef int order_char
         cdef vector.vector[Py_ssize_t] shape
         shape.push_back(self.size)
-        return self._reshape(shape)
+
+        order_char = _normalize_order(order, True)
+        if order_char == 'A':
+            if self._f_contiguous and not self._c_contiguous:
+                order_char = 'F'
+            else:
+                order_char = 'C'
+        if order_char == 'C':
+            return self._reshape(shape)
+        elif order_char == 'F':
+            return self.transpose()._reshape(shape)
+        elif order_char == 'K':
+            raise NotImplementedError(
+                "ravel with order='K' not yet implemented.")
 
     cpdef ndarray squeeze(self, axis=None):
         """Returns a view with size-one axes removed.
@@ -1793,13 +1824,16 @@ cdef class ndarray:
         """CUDA device on which this array resides."""
         return self.data.device
 
-    cpdef get(self, stream=None):
+    cpdef get(self, stream=None, order='C'):
         """Returns a copy of the array on host memory.
 
         Args:
             stream (cupy.cuda.Stream): CUDA stream object. If it is given, the
                 copy runs asynchronously. Otherwise, the copy is synchronous.
                 The default uses CUDA stream object of the current context.
+            order ({'C', 'F', 'A'}): The desired memory layout of the host
+                array. When ``order`` is 'A', it uses 'F' if the array is
+                fortran-contiguous and 'C' otherwise.
 
         Returns:
             numpy.ndarray: Copy of the array on host memory.
@@ -1808,9 +1842,21 @@ cdef class ndarray:
         if self.size == 0:
             return numpy.ndarray(self._shape, dtype=self.dtype)
 
+        order = order.upper()
+        if order == 'A':
+            if self._f_contiguous:
+                order = 'F'
+            else:
+                order = 'C'
+
         with self.device:
-            a_gpu = ascontiguousarray(self)
-        a_cpu = numpy.empty(self._shape, dtype=self.dtype)
+            if order == 'C':
+                a_gpu = ascontiguousarray(self)
+            elif order == 'F':
+                a_gpu = asfortranarray(self)
+            else:
+                raise ValueError("unsupported order: {}".format(order))
+        a_cpu = numpy.empty(self._shape, dtype=self.dtype, order=order)
         ptr = a_cpu.ctypes.get_as_parameter()
         if stream is not None:
             a_gpu.data.copy_to_host_async(ptr, a_gpu.nbytes, stream)
@@ -2379,6 +2425,8 @@ cpdef ndarray array(obj, dtype=None, bint copy=True, str order='K',
     cdef size_t nbytes
     if subok:
         raise NotImplementedError
+    if order is None:
+        order = 'K'
     if isinstance(obj, ndarray):
         src = obj
         if dtype is None:

@@ -172,6 +172,139 @@ def _pad_ref(arr, pad_amt, method, axis=-1):
     return cupy.concatenate((ref_chunk1, arr, ref_chunk2), axis=axis)
 
 
+def _pad_sym(arr, pad_amt, method, axis=-1):
+    """
+    Pad `axis` of `arr` by symmetry.
+
+    Parameters
+    ----------
+    arr : ndarray
+        Input array of arbitrary shape.
+    pad_amt : tuple of ints, length 2
+        Padding to (prepend, append) along `axis`.
+    method : str
+        Controls method of symmetry; options are 'even' or 'odd'.
+    axis : int
+        Axis along which to pad `arr`.
+
+    Returns
+    -------
+    padarr : ndarray
+        Output array, with `pad_amt[0]` values prepended and `pad_amt[1]`
+        values appended along `axis`. Both regions are padded with symmetric
+        values from the original array.
+
+    Notes
+    -----
+    This algorithm DOES pad with repetition, i.e. the edges are repeated.
+    For padding without repeated edges, use `mode='reflect'`.
+
+    The modes 'reflect', 'symmetric', and 'wrap' must be padded with a
+    single function, lest the indexing tricks in non-integer multiples of the
+    original shape would violate repetition in the final iteration.
+
+    """
+    # Implicit booleanness to test for zero (or None) in any scalar type
+    if pad_amt[0] == 0 and pad_amt[1] == 0:
+        return arr
+
+    ##########################################################################
+    # Prepended region
+
+    # Slice off a reverse indexed chunk from near edge to pad `arr` before
+    if pad_amt[0] == 0:
+        ax_slice = slice(0, 0)  # empty slice
+    else:
+        ax_slice = slice(pad_amt[0] - 1, None, -1)
+    sym_slice = tuple(
+        [slice(None) if i != axis else ax_slice
+         for i, x in enumerate(arr.shape)])
+    sym_chunk1 = arr[sym_slice]
+
+    # Memory/computationally more expensive, only do this if `method='odd'`
+    if 'odd' in method and pad_amt[0] > 0:
+        edge_slice1 = tuple([slice(None) if i != axis else slice(0, 1)
+                             for i, x in enumerate(arr.shape)])
+        edge_chunk = arr[edge_slice1]
+        sym_chunk1 = 2 * edge_chunk - sym_chunk1
+        del edge_chunk
+
+    ##########################################################################
+    # Appended region
+
+    # Slice off a reverse indexed chunk from far edge to pad `arr` after
+    sym_slice = tuple(
+        [slice(None) if i != axis else slice(-1, -1 - pad_amt[1], -1)
+         for i, x in enumerate(arr.shape)])
+    sym_chunk2 = arr[sym_slice]
+
+    if 'odd' in method:
+        edge_slice2 = tuple([slice(None) if i != axis else slice(-1, None)
+                             for i, x in enumerate(arr.shape)])
+        edge_chunk = arr[edge_slice2]
+        sym_chunk2 = 2 * edge_chunk - sym_chunk2
+        del edge_chunk
+
+    # Concatenate `arr` with both chunks, extending along `axis`
+    return cupy.concatenate((sym_chunk1, arr, sym_chunk2), axis=axis)
+
+
+def _pad_wrap(arr, pad_amt, axis=-1):
+    """
+    Pad `axis` of `arr` via wrapping.
+
+    Parameters
+    ----------
+    arr : ndarray
+        Input array of arbitrary shape.
+    pad_amt : tuple of ints, length 2
+        Padding to (prepend, append) along `axis`.
+    axis : int
+        Axis along which to pad `arr`.
+
+    Returns
+    -------
+    padarr : ndarray
+        Output array, with `pad_amt[0]` values prepended and `pad_amt[1]`
+        values appended along `axis`. Both regions are padded wrapped values
+        from the opposite end of `axis`.
+
+    Notes
+    -----
+    This method of padding is also known as 'tile' or 'tiling'.
+
+    The modes 'reflect', 'symmetric', and 'wrap' must be padded with a
+    single function, lest the indexing tricks in non-integer multiples of the
+    original shape would violate repetition in the final iteration.
+
+    """
+    # Implicit booleanness to test for zero (or None) in any scalar type
+    if pad_amt[0] == 0 and pad_amt[1] == 0:
+        return arr
+
+    ##########################################################################
+    # Prepended region
+
+    # slice off section from end to append to front
+    dim = arr.shape[axis]
+    wrap_slice = tuple(
+        [slice(None) if i != axis else slice(dim - pad_amt[0], dim)
+         for i, x in enumerate(arr.shape)])
+    wrap_chunk1 = arr[wrap_slice]
+
+    ##########################################################################
+    # Appended region
+
+    # slice off section from front to append to end
+    wrap_slice = tuple(
+        [slice(None) if i != axis else slice(0, pad_amt[1])
+         for i, x in enumerate(arr.shape)])
+    wrap_chunk2 = arr[wrap_slice]
+
+    # Concatenate `arr` with both chunks, extending along `axis`
+    return cupy.concatenate((wrap_chunk1, arr, wrap_chunk2), axis=axis)
+
+
 def _normalize_shape(ndarray, shape, cast_to_int=True):
     ndims = ndarray.ndim
     if shape is None:
@@ -223,6 +356,13 @@ def pad(array, pad_width, mode, **keywords):
             'reflect'
                 Pads with the reflection of the vector mirrored on the first
                 and last values of the vector along each axis.
+            'symmetric'
+                Pads with the reflection of the vector mirrored
+                along the edge of the array.
+            'wrap'
+                Pads with the wrap of the vector along the axis.
+                The first values are used to pad the end and the
+                end values are used to pad the beginning.
         constant_values (int or array-like): Used in
             ``constant``.
             The values are padded for each axis.
@@ -255,6 +395,8 @@ def pad(array, pad_width, mode, **keywords):
         'constant': ['constant_values'],
         'edge': [],
         'reflect': ['reflect_type'],
+        'symmetric': ['reflect_type'],
+        'wrap': [],
     }
     keyword_defaults = {
         'constant_values': 0,
@@ -318,4 +460,42 @@ def pad(array, pad_width, mode, **keywords):
                 safe_pad += pad_iter_b + pad_iter_a
             newmatrix = _pad_ref(
                 newmatrix, (pad_before, pad_after), method, axis)
+    elif mode == 'symmetric':
+        for axis, (pad_before, pad_after) in enumerate(pad_width):
+            # Recursive padding along any axis where `pad_amt` is too large
+            # for indexing tricks. We can only safely pad the original axis
+            # length, to keep the period of the reflections consistent.
+            method = keywords['reflect_type']
+            safe_pad = newmatrix.shape[axis]
+            while ((pad_before > safe_pad) or
+                   (pad_after > safe_pad)):
+                pad_iter_b = min(safe_pad,
+                                 safe_pad * (pad_before // safe_pad))
+                pad_iter_a = min(safe_pad, safe_pad * (pad_after // safe_pad))
+                newmatrix = _pad_sym(newmatrix, (pad_iter_b,
+                                     pad_iter_a), method, axis)
+                pad_before -= pad_iter_b
+                pad_after -= pad_iter_a
+                safe_pad += pad_iter_b + pad_iter_a
+            newmatrix = _pad_sym(newmatrix, (pad_before, pad_after), method,
+                                 axis)
+    elif mode == 'wrap':
+        for axis, (pad_before, pad_after) in enumerate(pad_width):
+            # Recursive padding along any axis where `pad_amt` is too large
+            # for indexing tricks. We can only safely pad the original axis
+            # length, to keep the period of the reflections consistent.
+            safe_pad = newmatrix.shape[axis]
+            while ((pad_before > safe_pad) or
+                   (pad_after > safe_pad)):
+                pad_iter_b = min(safe_pad,
+                                 safe_pad * (pad_before // safe_pad))
+                pad_iter_a = min(safe_pad, safe_pad * (pad_after // safe_pad))
+                newmatrix = _pad_wrap(
+                    newmatrix, (pad_iter_b, pad_iter_a), axis)
+
+                pad_before -= pad_iter_b
+                pad_after -= pad_iter_a
+                safe_pad += pad_iter_b + pad_iter_a
+            newmatrix = _pad_wrap(newmatrix, (pad_before, pad_after), axis)
+
     return newmatrix

@@ -29,3 +29,9 @@ class TestUnique(unittest.TestCase):
     def test_unique_counts(self, xp, dtype):
         a = testing.shaped_random((100, 100), xp, dtype)
         return xp.unique(a, return_counts=True)[1]
+
+    @testing.for_all_dtypes(no_float16=True, no_bool=True, no_complex=True)
+    @testing.numpy_cupy_array_equal()
+    def test_unique_size0(self, xp, dtype):
+        a = xp.empty((0, ), dtype=dtype)
+        return xp.unique(a, return_index=True)[0]

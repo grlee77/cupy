@@ -546,6 +546,7 @@ from cupy.math.misc import absolute as abs  # NOQA
 from cupy.math.misc import absolute  # NOQA
 from cupy.math.misc import cbrt  # NOQA
 from cupy.math.misc import clip  # NOQA
+from cupy.math.misc import diff  # NOQA
 from cupy.math.misc import fmax  # NOQA
 from cupy.math.misc import fmin  # NOQA
 from cupy.math.misc import maximum  # NOQA
@@ -628,7 +629,7 @@ from cupy.core import fromDlpack  # NOQA
 from cupy.ext.scatter import scatter_add  # NOQA
 
 
-def asnumpy(a, stream=None):
+def asnumpy(a, stream=None, order='C'):
     """Returns an array on the host memory from an arbitrary source array.
 
     Args:
@@ -637,15 +638,17 @@ def asnumpy(a, stream=None):
             the device-to-host copy runs asynchronously. Otherwise, the copy is
             synchronous. Note that if ``a`` is not a :class:`cupy.ndarray`
             object, then this argument has no effect.
-
+        order ({'C', 'F', 'A'}): The desired memory layout of the host
+            array. When ``order`` is 'A', it uses 'F' if ``a`` is
+            fortran-contiguous and 'C' otherwise.
     Returns:
         numpy.ndarray: Converted array on the host memory.
 
     """
     if isinstance(a, ndarray):
-        return a.get(stream=stream)
+        return a.get(stream=stream, order=order)
     else:
-        return numpy.asarray(a)
+        return numpy.asarray(a, order=order)
 
 
 _cupy = sys.modules[__name__]
