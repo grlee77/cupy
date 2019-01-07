@@ -4,6 +4,7 @@ import unittest
 import numpy as np
 
 import cupy
+from cupy.fft import cache
 from cupy import testing
 from cupy.fft import config
 from cupy.fft.fft import _default_plan_type
@@ -48,6 +49,16 @@ def nd_planning_states(states=[True, False], name='enable_nd'):
         return test_func
     return decorator
 
+class CachedTestCase(unittest.TestCase):
+    """Enable caching of CUFFT plans during the test."""
+
+    def setUp(self):
+        cache.enable()
+        cache.set_keepalive_time(1.0)  # retain items in cache for 1 second
+
+    def tearDown(self):
+        cache.disable()
+
 
 @testing.parameterize(*testing.product({
     'n': [None, 0, 5, 10, 15],
@@ -56,7 +67,7 @@ def nd_planning_states(states=[True, False], name='enable_nd'):
 }))
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestFft(unittest.TestCase):
+class TestFft(CachedTestCase):
 
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
@@ -82,6 +93,16 @@ class TestFft(unittest.TestCase):
             out = out.astype(np.complex64)
 
         return out
+
+
+@testing.gpu
+class TestFftCacheEnableDisable(CachedTestCase):
+
+    def test_cache_is_enabled(self):
+        assert cache.is_enabled()
+
+        cache.disable()
+        assert not cache.is_enabled()
 
 
 @testing.gpu
@@ -152,7 +173,7 @@ class TestFftAllocate(unittest.TestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestFft2(unittest.TestCase):
+class TestFft2(CachedTestCase):
 
     @nd_planning_states()
     @testing.for_all_dtypes()
@@ -204,7 +225,7 @@ class TestFft2(unittest.TestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestFftn(unittest.TestCase):
+class TestFftn(CachedTestCase):
 
     @nd_planning_states()
     @testing.for_all_dtypes()
@@ -297,7 +318,7 @@ class TestFftnContiguity(unittest.TestCase):
 }))
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestRfft(unittest.TestCase):
+class TestRfft(CachedTestCase):
 
     @testing.for_all_dtypes(no_complex=True)
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, contiguous_check=False)
@@ -347,7 +368,7 @@ class TestRfft(unittest.TestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestRfft2(unittest.TestCase):
+class TestRfft2(CachedTestCase):
 
     @testing.for_all_dtypes(no_complex=True)
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
@@ -397,7 +418,7 @@ class TestRfft2(unittest.TestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestRfftn(unittest.TestCase):
+class TestRfftn(CachedTestCase):
 
     @testing.for_all_dtypes(no_complex=True)
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
@@ -431,7 +452,7 @@ class TestRfftn(unittest.TestCase):
 }))
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestHfft(unittest.TestCase):
+class TestHfft(CachedTestCase):
 
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, contiguous_check=False)
@@ -463,7 +484,7 @@ class TestHfft(unittest.TestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestFftfreq(unittest.TestCase):
+class TestFftfreq(CachedTestCase):
 
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, contiguous_check=False)
@@ -491,7 +512,7 @@ class TestFftfreq(unittest.TestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestFftshift(unittest.TestCase):
+class TestFftshift(CachedTestCase):
 
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, contiguous_check=False)
