@@ -171,7 +171,7 @@ class CacheTest(unittest.TestCase):
 
         def cache_parent_thread():
             cache._Cache()
-            time.sleep(0.25)
+            time.sleep(0.5)
 
         # We give the parent thread the same name as a Cache thread so
         # it is picked up by the _check_n_cache_threads_running function
