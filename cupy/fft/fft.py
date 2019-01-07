@@ -1,4 +1,5 @@
 from copy import copy
+from threading import get_ident
 
 import six
 
@@ -8,6 +9,7 @@ import cupy
 from cupy.cuda import cufft
 from math import sqrt
 from cupy.fft import config
+from cupy.fft import cache
 
 
 def _output_dtype(a, value_type):
@@ -83,7 +85,31 @@ def _exec_fft(a, direction, value_type, norm, axis, overwrite_x,
         out_size = a.shape[-1]
 
     batch = a.size // a.shape[-1]
-    plan = cufft.Plan1d(out_size, fft_type, batch)
+    if cache.is_enabled():
+        # CUFFT plans can only be safely used by the thread that created them
+        thread_id = get_ident()
+
+        # Note: if user-defined stream supported is added to Plan1d in the
+        # future, the stream should be added to the key as well.
+        key = (out_size, fft_type, batch, thread_id)
+
+        try:
+            if key in cache._cufft_cache:
+                plan = cache._cufft_cache.lookup(key)
+            else:
+                plan = None
+
+        except KeyError:
+            # This occurs if the object has fallen out of the cache between
+            # the check and the lookup
+            plan = None
+
+        if plan is None:
+            plan = cufft.Plan1d(out_size, fft_type, batch)
+            cache._cufft_cache.insert(plan, key)
+    else:
+        plan = cufft.Plan1d(out_size, fft_type, batch)
+
     if overwrite_x and value_type == 'C2C':
         out = a
     elif out is not None:
@@ -284,15 +310,40 @@ def get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
                 "GPU case (Can only batch FFT over the first or last "
                 "spatial axes).")
 
-    plan = cufft.PlanNd(shape=plan_dimensions,
-                        istride=istride,
-                        ostride=ostride,
-                        inembed=inembed,
-                        onembed=onembed,
-                        idist=idist,
-                        odist=odist,
-                        fft_type=fft_type,
-                        batch=nbatch)
+    if cache.is_enabled():
+        # CUFFT plans can only be safely used by the thread that created them
+        thread_id = get_ident()
+
+        # Note: if user-defined stream supported is added to Plan1d in the
+        # future, the stream should be added to the key as well.
+        key = (shape, istride, ostride, inembed, onembed, idist, odist,
+               fft_type, nbatch, thread_id)
+
+        try:
+            if key in cache._cufft_cache:
+                plan = cache._cufft_cache.lookup(key)
+            else:
+                plan = None
+
+        except KeyError:
+            # This occurs if the object has fallen out of the cache between
+            # the check and the lookup
+            plan = None
+
+    if not cache.is_enabled() or plan is None:
+
+        plan = cufft.PlanNd(shape=plan_dimensions,
+                            istride=istride,
+                            ostride=ostride,
+                            inembed=inembed,
+                            onembed=onembed,
+                            idist=idist,
+                            odist=odist,
+                            fft_type=fft_type,
+                            batch=nbatch)
+        if cache.is_enabled():
+            cache._cufft_cache.insert(plan, key)
+
     return plan
 
 
