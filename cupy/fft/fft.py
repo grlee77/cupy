@@ -190,7 +190,7 @@ def get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
             Currently only complex-to-complex transforms are supported.
         axes (None or int or tuple of int):  The axes of the array to
             transform. Currently, these must be a set of up to three adjacent
-            axes and must nclude either the first or the last axis of the
+            axes and must include either the first or the last axis of the
             array.  If `None`, it is assumed that all axes are transformed.
         order ({'C', 'F'}): Specify whether the data to be transformed has C or
             Fortran ordered data layout.
