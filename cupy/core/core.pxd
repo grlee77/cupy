@@ -28,8 +28,6 @@ cdef class ndarray:
     cpdef ndarray copy(self, order=*)
     cpdef ndarray view(self, dtype=*)
     cpdef fill(self, value)
-    cpdef ndarray _reshape(self, vector.vector[Py_ssize_t] shape)
-    cpdef ndarray _transpose(self, vector.vector[Py_ssize_t] axes)
     cpdef ndarray swapaxes(self, Py_ssize_t axis1, Py_ssize_t axis2)
     cpdef ndarray flatten(self)
     cpdef ndarray ravel(self, order=*)
@@ -63,7 +61,7 @@ cdef class ndarray:
     cpdef ndarray std(self, axis=*, dtype=*, out=*, ddof=*,
                       keepdims=*)
     cpdef ndarray prod(self, axis=*, dtype=*, out=*, keepdims=*)
-    cpdef ndarray cumprod(a, axis=*, dtype=*, out=*)
+    cpdef ndarray cumprod(self, axis=*, dtype=*, out=*)
 
     cpdef ndarray all(self, axis=*, out=*, keepdims=*)
     cpdef ndarray any(self, axis=*, out=*, keepdims=*)
@@ -85,14 +83,6 @@ cdef class ndarray:
     cpdef object toDlpack(self)
 
 
-cdef class broadcast:
-    cdef:
-        readonly tuple values
-        readonly tuple shape
-        readonly Py_ssize_t size
-        readonly Py_ssize_t nd
-
-
 cdef class Indexer:
     cdef:
         readonly Py_ssize_t size
@@ -104,3 +94,8 @@ cdef class Indexer:
 cpdef ndarray ascontiguousarray(ndarray a, dtype=*)
 cpdef Module compile_with_cache(str source, tuple options=*, arch=*,
                                 cachd_dir=*, prepend_cupy_headers=*)
+
+
+# TODO(niboshi): Move to _routines_creation.pyx
+cpdef ndarray array(obj, dtype=*, bint copy=*, order=*, bint subok=*,
+                    Py_ssize_t ndmin=*)
