@@ -1,11 +1,10 @@
+cimport cpython  # NOQA
 import os
+import warnings
 
 from cupy import cuda
-
 from cupy.cuda cimport function
 from cupy.cuda cimport runtime
-
-import warnings
 
 
 cdef struct _CArray:
@@ -20,8 +19,7 @@ cdef class CArray(CPointer):
         _CArray val
 
     def __init__(self, ndarray arr):
-        cdef Py_ssize_t i
-        cdef int ndim = arr._shape.size()
+        cdef int i, ndim = arr._shape.size()
         self.val.data = <void*>arr.data.ptr
         self.val.size = arr.size
         for i in range(ndim):
@@ -41,7 +39,7 @@ cdef class CIndexer(CPointer):
 
     def __init__(self, Py_ssize_t size, tuple shape):
         self.val.size = size
-        cdef Py_ssize_t i
+        cdef int i
         for i in range(len(shape)):
             self.val.shape_and_index[i] = shape[i]
         self.ptr = <void*>&self.val
@@ -49,7 +47,7 @@ cdef class CIndexer(CPointer):
 
 cdef class Indexer:
     def __init__(self, tuple shape):
-        cdef Py_ssize_t size = 1
+        cdef Py_ssize_t s, size = 1
         for s in shape:
             size *= s
         self.shape = shape
