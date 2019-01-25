@@ -1,3 +1,4 @@
+import cupy
 from cupy import core
 from cupy.core import _routines_math as _math
 from cupy.core import fusion
