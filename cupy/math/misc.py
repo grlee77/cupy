@@ -1,9 +1,6 @@
-import cupy
 from cupy import core
 from cupy.core import _routines_math as _math
 from cupy.core import fusion
-
-from numpy.core.multiarray import normalize_axis_index
 
 # TODO(okuta): Implement convolve
 
@@ -217,48 +214,3 @@ nan_to_num = core.create_ufunc(
 
 
 # TODO(okuta): Implement interp
-
-
-def diff(a, n=1, axis=-1):
-    """Calculate the n-th discrete difference along the given axis.
-
-    The first difference is given by ``out[n] = a[n+1] - a[n]`` along
-    the given axis, higher differences are calculated by using `diff`
-    recursively.
-
-    It does not have ``datetime64`` support.
-
-    Args:
-        a (array_like): Input array
-        n (int, optional):
-            The number of times values are differenced. If zero, the input is
-            returned as-is.
-        axis (int, optional):
-            The axis along which the difference is taken, default is the last
-            axis.
-    Returns:
-        diff (ndarray):
-            The n-th differences. The shape of the output is the same as `a`
-            except along `axis` where the dimension is smaller by `n`. The
-            type of the output is the same as the type of the difference
-            between any two elements of `a`. This is the same as the type of
-            `a` in most cases.
-
-    .. seealso:: :func:`numpy.diff`
-    """
-    a = cupy.asanyarray(a)
-    nd = a.ndim
-    axis = normalize_axis_index(axis, nd)
-
-    slice1 = [slice(None)] * nd
-    slice2 = [slice(None)] * nd
-    slice1[axis] = slice(1, None)
-    slice2[axis] = slice(None, -1)
-    slice1 = tuple(slice1)
-    slice2 = tuple(slice2)
-
-    op = cupy.not_equal if a.dtype == cupy.bool_ else cupy.subtract
-    for _ in range(n):
-        a = op(a[slice1], a[slice2])
-
-    return a
