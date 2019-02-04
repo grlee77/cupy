@@ -1,6 +1,5 @@
 cimport cython  # NOQA
 import numpy
-cimport numpy as cnp
 
 import cupy
 from cupy.cuda cimport driver
