@@ -216,7 +216,7 @@ class coo_matrix(sparse_data._data_matrix):
         if self.data.size == 0:
             self._has_canonical_format = True
             return
-        keys = cupy.stack([self.col, self.row])  # GRL: I swapped the order of row/col here to match empirical result from scipy for COO->CSR conversion
+        keys = cupy.stack([self.row, self.col])
         order = cupy.lexsort(keys)
         src_data = self.data[order]
         src_row = self.row[order]

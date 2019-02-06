@@ -397,6 +397,10 @@ cdef extern from "cupy_cusparse.h":
         Handle handle, int m, int n, int nnz, int *cooRows, int *cooCols,
         int *P, void *pBuffer)
 
+    Status cusparseXcoosortByColumn(
+        Handle handle, int m, int n, int nnz, int *cooRows, int *cooCols,
+        int *P, void *pBuffer)
+
     Status cusparseXcsrsort_bufferSizeExt(
         Handle handle, int m, int n, int nnz, const int *csrRowPtr,
         const int *csrColInd, size_t *pBufferSizeInBytes)
@@ -1328,6 +1332,16 @@ cpdef xcoosortByRow(
         size_t P, size_t pBuffer):
     setStream(handle, stream_module.get_current_stream_ptr())
     status = cusparseXcoosortByRow(
+        <Handle>handle, m, n, nnz, <int *>cooRows, <int *>cooCols,
+        <int *>P, <void *>pBuffer)
+    check_status(status)
+
+
+cpdef xcoosortByColumn(
+        size_t handle, int m, int n, int nnz, size_t cooRows, size_t cooCols,
+        size_t P, size_t pBuffer):
+    setStream(handle, stream_module.get_current_stream_ptr())
+    status = cusparseXcoosortByColumn(
         <Handle>handle, m, n, nnz, <int *>cooRows, <int *>cooCols,
         <int *>P, <void *>pBuffer)
     check_status(status)

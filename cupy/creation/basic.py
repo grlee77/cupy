@@ -204,7 +204,12 @@ def zeros_like(a, dtype=None, order='K'):
         dtype = a.dtype
     order, strides, memptr = _new_like_order_and_strides(a, dtype, order)
     a = cupy.ndarray(a.shape, dtype, memptr, strides, order)
-    a.data.memset_async(0, a.nbytes)
+    try:
+        a.data.memset_async(0, a.nbytes)
+    except cupy.cuda.runtime.CUDARuntimeError:
+        # retry:  TODO: why do I get an intermittant CUDARuntimeError
+        cupy.cuda.device.Device(cupy.cuda.device.get_device_id()).synchronize()        
+        a.data.memset_async(0, a.nbytes)
     return a
 
 
