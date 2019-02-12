@@ -50,6 +50,16 @@ cdef class Extent:
         self.width = width
 
 
+class FormatDesc:
+
+    def __init__(self, int f, int w, int x, int y, int z):
+        self.f = f
+        self.w = w
+        self.x = x
+        self.y = y
+        self.z = z
+
+
 # cdef class Memcpy3DParms:
 
 #     def __init__(self, driver.Array dstArray, _Pos dstPos, PitchedPtr dstPtr,
@@ -72,6 +82,7 @@ cdef extern from *:
     ctypedef int DeviceAttr 'enum cudaDeviceAttr'
     ctypedef int MemoryAdvise 'enum cudaMemoryAdvise'
     ctypedef int MemoryKind 'enum cudaMemcpyKind'
+    ctypedef int ChannelFormatKind 'enum cudaChannelFormatKind'
 
     ctypedef void StreamCallbackDef(
         driver.Stream stream, Error status, void* userData)
@@ -113,6 +124,13 @@ cdef extern from "cupy_cuda.h" nogil:
         _Pos srcPos
         _PitchedPtr srcPtr
 
+    struct _ChannelFormatDesc 'cudaChannelFormatDesc':
+        ChannelFormatKind f
+        int w
+        int x
+        int y
+        int z
+
     # Error handling
     const char* cudaGetErrorName(Error error)
     const char* cudaGetErrorString(Error error)
@@ -142,6 +160,11 @@ cdef extern from "cupy_cuda.h" nogil:
     int cudaMemGetInfo(size_t* free, size_t* total)
     int cudaMalloc(void** devPtr, size_t size) nogil
     int cudaMallocPitch(void** devPtr, size_t *pitch, size_t width, size_t height) nogil
+    int cudaMallocArray(driver.Array* array, _ChannelFormatDesc* desc,
+                        size_t width, size_t height, unsigned int flags) nogil
+    int cudaMalloc3DArray(driver.Array* array, _ChannelFormatDesc* desc,
+                          _Extent extent, unsigned int flags) nogil
+
     int cudaMemcpy(void* dst, const void* src, size_t count,
                    MemoryKind kind)
     int cudaMemcpyAsync(void* dst, const void* src, size_t count,
@@ -303,6 +326,42 @@ cpdef intptr_t mallocPitch(
         status = cudaMallocPitch(&ptr, &pitch, width, height)
     check_status(status)
     return <intptr_t>ptr, pitch
+
+
+# cpdef intptr_t mallocArray(
+#         _ChannelFormatDesc *desc, size_t width, size_t height, unsigned int flags) except? 0:
+cpdef intptr_t mallocArray(
+        object format_desc, size_t width, size_t height, unsigned int flags) except? 0:
+    cdef void* arr
+    cdef _ChannelFormatDesc _desc
+    _desc.f = <ChannelFormatKind>format_desc.f
+    _desc.w = format_desc.w
+    _desc.x = format_desc.x
+    _desc.y = format_desc.y
+    _desc.z = format_desc.z
+    with nogil:
+        status = cudaMallocArray(<driver.Array*>arr, &_desc, width, height, flags)
+        # status = cudaMallocArray(<driver.Array*>arr, desc, width, height, flags)
+    check_status(status)
+    return <intptr_t>arr
+
+
+# cpdef intptr_t malloc3DArray(
+#         _ChannelFormatDesc *desc, _Extent extent, unsigned int flags) except? 0:
+cpdef intptr_t malloc3DArray(
+        object format_desc, _Extent extent, unsigned int flags) except? 0:
+    cdef void* arr
+    cdef _ChannelFormatDesc _desc
+    _desc.f = <ChannelFormatKind>format_desc.f
+    _desc.w = format_desc.w
+    _desc.x = format_desc.x
+    _desc.y = format_desc.y
+    _desc.z = format_desc.z
+    with nogil:
+        status = cudaMalloc3DArray(<driver.Array*>arr, &_desc, extent, flags)
+        # status = cudaMalloc3DArray(<driver.Array*>arr, desc, extent, flags)
+    check_status(status)
+    return <intptr_t>arr
 
 
 cpdef intptr_t hostAlloc(size_t size, unsigned int flags) except? 0:

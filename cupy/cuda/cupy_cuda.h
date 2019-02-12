@@ -163,6 +163,7 @@ typedef enum {} cudaDataType;
 enum cudaDeviceAttr {};
 enum cudaMemoryAdvise {};
 enum cudaMemcpyKind {};
+enum cudaChannelFormatKind {};
 
 
 typedef void (*cudaStreamCallback_t)(
@@ -273,6 +274,14 @@ cudaError_t cudaMallocManaged(...) {
 }
 
 cudaError_t cudaMallocPitch(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaMallocArray(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaMalloc3DArray(...) {
     return cudaSuccess;
 }
 

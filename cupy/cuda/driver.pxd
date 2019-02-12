@@ -57,6 +57,11 @@ cpdef enum:
 
     CUDA_ERROR_INVALID_VALUE = 1
 
+    CU_MEMORYTYPE_HOST = 0x01
+    CU_MEMORYTYPE_DEVICE = 0x02
+    CU_MEMORYTYPE_ARRAY = 0x03
+    CU_MEMORYTYPE_UNIFIED = 0x04
+
 
 ###############################################################################
 # Primary context management
