@@ -24,6 +24,40 @@ cdef class PointerAttributes:
         self.isManaged = isManaged
         self.memoryType = memoryType
 
+cdef class PitchedPtr:
+
+    def __init__(self, size_t pitch, intptr_t ptr, size_t xsize, size_t ysize):
+        self.pitch = pitch
+        self.ptr = ptr
+        self.xsize = xsize
+        self.ysize = ysize
+
+cdef class Pos:
+
+    def __init__(self, size_t x, size_t y, size_t z):
+        self.x = x
+        self.y = y
+        self.z = z
+
+cdef class Extent:
+
+    def __init__(self, size_t depth, size_t height, size_t width):
+        self.depth = depth
+        self.height = height
+        self.width = width
+
+# cdef class Memcpy3DParms:
+
+#     def __init__(self,
+
+#     #     cudaArray_t dstArray
+#     #     _Pos dstPos
+#     #     _PitchedPtr dstPtr
+#     #     _Extent extent
+#     #     MemoryKind kind
+#     #     cudaArray_t srcArray
+#     #     _Pos srcPos
+#     #     _PitchedPtr srcPtr
 
 ###############################################################################
 # Extern
@@ -46,6 +80,32 @@ cdef extern from "cupy_cuda.h" nogil:
         void* hostPointer
         int isManaged
         int memoryType
+
+    struct _PitchedPtr 'cudaPitchedPtr':
+        size_t pitch
+        void* ptr
+        size_t xsize
+        size_t ysize
+
+    struct _Pos 'cudaPos':
+        size_t x
+        size_t y
+        size_t z
+
+    struct _Extent 'cudaExtent':
+        size_t depth
+        size_t height
+        size_t width
+
+    # struct _Memcpy3DParms 'cudaMemcpy3DParms':
+    #     cudaArray_t dstArray
+    #     _Pos dstPos
+    #     _PitchedPtr dstPtr
+    #     _Extent extent
+    #     MemoryKind kind
+    #     cudaArray_t srcArray
+    #     _Pos srcPos
+    #     _PitchedPtr srcPtr
 
     # Error handling
     const char* cudaGetErrorName(Error error)
@@ -85,6 +145,10 @@ cdef extern from "cupy_cuda.h" nogil:
     int cudaMemcpyPeerAsync(void* dst, int dstDevice, const void* src,
                             int srcDevice, size_t count,
                             driver.Stream stream)
+    int cudaMemcpy2D(void* dst, size_t dpitch, const void* src,
+                     size_t spitch, size_t width, size_t height,
+                     MemoryKind kind)
+    # int cudaMemcpy3D(_Memcpy3DParms* p)
     int cudaMemset(void* devPtr, int value, size_t count)
     int cudaMemsetAsync(void* devPtr, int value, size_t count,
                         driver.Stream stream)
@@ -290,6 +354,14 @@ cpdef memcpyPeerAsync(intptr_t dst, int dstDevice, intptr_t src, int srcDevice,
     with nogil:
         status = cudaMemcpyPeerAsync(<void*>dst, dstDevice, <void*>src,
                                      srcDevice, size, <driver.Stream> stream)
+    check_status(status)
+
+
+cpdef memcpy2D(intptr_t dst, size_t dpitch, intptr_t src, size_t spitch,
+               size_t width, size_t height, int kind):
+    with nogil:
+        status = cudaMemcpy2D(<void*>dst, dpitch, <void*> src, spitch, width,
+                              height, <MemoryKind> kind)
     check_status(status)
 
 

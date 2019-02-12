@@ -176,6 +176,29 @@ struct cudaPointerAttributes{
     int memoryType;
 };
 
+struct cudaExtent {
+  size_t width;
+  size_t height;
+  size_t depth;
+};
+
+struct cudaPos {
+  size_t x;
+  size_t y;
+  size_t z;
+};
+
+// struct cudaMemcpy3DParms {
+//   cudaArray_t           srcArray;
+//   struct cudaPos        srcPos;
+//   struct cudaPitchedPtr srcPtr;
+//   cudaArray_t           dstArray;
+//   struct cudaPos        dstPos;
+//   struct cudaPitchedPtr dstPtr;
+//   struct cudaExtent     extent;
+//   enum cudaMemcpyKind   kind;
+// };
+
 typedef cudaPointerAttributes _PointerAttributes;
 
 
@@ -275,6 +298,10 @@ cudaError_t cudaMemcpyPeer(...) {
 }
 
 cudaError_t cudaMemcpyPeerAsync(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaMemcpy2D(...) {
     return cudaSuccess;
 }
 
