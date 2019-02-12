@@ -82,6 +82,31 @@ cdef class Memory(BaseMemory):
             runtime.free(self.ptr)
 
 
+@cython.no_gc
+cdef class MemoryPitch(BaseMemory):
+    """Pitched memory allocation on a CUDA device.
+
+    This class provides an RAII interface of the CUDA memory allocation.
+
+    Args:
+        width (int): Width of the pitched allocation (in bytes)
+        height (int): Height of the pitched allocation (in bytes)
+    """
+
+    def __init__(self, size_t width, size_t height):
+        self.width = width
+        self.height = height
+        self.device_id = device.get_device_id()
+        self.ptr = 0
+        self.pitch = 0
+        if width > 0 and height > 0:
+            self.ptr, self.pitch = runtime.mallocPitch(width, height)
+
+    def __dealloc__(self):
+        if self.ptr:
+            runtime.free(self.ptr)
+
+
 cdef class UnownedMemory(BaseMemory):
     """CUDA memory that is not owned by CuPy.
 
