@@ -246,6 +246,10 @@ cudaError_t cudaMallocManaged(...) {
     return cudaSuccess;
 }
 
+cudaError_t cudaMallocPitch(...) {
+    return cudaSuccess;
+}
+
 int cudaFree(...) {
     return cudaSuccess;
 }
