@@ -164,6 +164,28 @@ cdef extern from "cupy_cuda.h" nogil:
                         size_t width, size_t height, unsigned int flags) nogil
     int cudaMalloc3DArray(driver.Array* array, _ChannelFormatDesc* desc,
                           _Extent extent, unsigned int flags) nogil
+    # TODO: RUNTIME API: cudaArrayGetInfo ( cudaChannelFormatDesc* desc, cudaExtent* extent, unsigned int* flags, cudaArray_t array )
+    # https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__MEMORY.html#group__CUDART__MEMORY_1g373dacf191566b0bf5e5b807517b6bf9
+    # TODO: RUNTIME API:  cudaFreeArray ( cudaArray_t array )
+    #                     cudaMemcpy2DArrayToArray ( cudaArray_t dst, size_t wOffsetDst, size_t hOffsetDst, cudaArray_const_t src, size_t wOffsetSrc, size_t hOffsetSrc, size_t width, size_t height, cudaMemcpyKind kind = cudaMemcpyDeviceToDevice )
+    #                     cudaMemcpy2DFromArray ( void* dst, size_t dpitch, cudaArray_const_t src, size_t wOffset, size_t hOffset, size_t width, size_t height, cudaMemcpyKind kind )
+    #                     cudaMemcpy2DFromArrayAsync ( void* dst, size_t dpitch, cudaArray_const_t src, size_t wOffset, size_t hOffset, size_t width, size_t height, cudaMemcpyKind kind, cudaStream_t stream = 0 )
+    #                     cudaMemcpy2DToArray ( cudaArray_t dst, size_t wOffset, size_t hOffset, const void* src, size_t spitch, size_t width, size_t height, cudaMemcpyKind kind )
+    #                     cudaMemcpy2DToArrayAsync ( cudaArray_t dst, size_t wOffset, size_t hOffset, const void* src, size_t spitch, size_t width, size_t height, cudaMemcpyKind kind, cudaStream_t stream = 0 )
+    #                     cudaMemcpyArrayToArray ( cudaArray_t dst, size_t wOffsetDst, size_t hOffsetDst, cudaArray_const_t src, size_t wOffsetSrc, size_t hOffsetSrc, size_t count, cudaMemcpyKind kind = cudaMemcpyDeviceToDevice )
+    #                     cudaMemcpyFromArray ( void* dst, cudaArray_const_t src, size_t wOffset, size_t hOffset, size_t count, cudaMemcpyKind kind )
+    #                     cudaMemcpyFromArrayAsync ( void* dst, cudaArray_const_t src, size_t wOffset, size_t hOffset, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0 )
+    #                     cudaMemcpyToArray ( cudaArray_t dst, size_t wOffset, size_t hOffset, const void* src, size_t count, cudaMemcpyKind kind )
+    #                     cudaMemcpyToArrayAsync ( cudaArray_t dst, size_t wOffset, size_t hOffset, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0 )
+    #                     cudaMemset2D ( void* devPtr, size_t pitch, int  value, size_t width, size_t height )
+    #                     cudaMemset2DAsync ( void* devPtr, size_t pitch, int  value, size_t width, size_t height, cudaStream_t stream = 0 )
+    #                     cudaMemset3D ( cudaPitchedPtr pitchedDevPtr, int  value, cudaExtent extent )
+    #                     cudaMemset3DAsync ( cudaPitchedPtr pitchedDevPtr, int  value, cudaExtent extent, cudaStream_t stream = 0 )
+    #
+    # DRIVER API?: CUresult cuArray3DGetDescriptor ( CUDA_ARRAY3D_DESCRIPTOR* pArrayDescriptor, CUarray hArray )
+    # DRIVER API?: CUresult cuArrayGetDescriptor ( CUDA_ARRAY_DESCRIPTOR* pArrayDescriptor, CUarray hArray )
+    # DRIVER API?: struct CUDA_ARRAY_DESCRIPTOR
+    # DRIVER API?: struct CUDA_ARRAY3D_DESCRIPTOR
 
     int cudaMemcpy(void* dst, const void* src, size_t count,
                    MemoryKind kind)
