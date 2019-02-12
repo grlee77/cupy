@@ -30,6 +30,7 @@ cdef extern from *:
     ctypedef void* Module 'struct CUmod_st*'
     ctypedef void* Stream 'struct CUstream_st*'
     ctypedef void* LinkState 'CUlinkState'
+    ctypedef void* Array 'struct cudaArray*'
 
     ctypedef int CUjit_option 'CUjit_option'
     ctypedef int CUjitInputType 'CUjitInputType'

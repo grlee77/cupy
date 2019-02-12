@@ -24,6 +24,7 @@ cdef class PointerAttributes:
         self.isManaged = isManaged
         self.memoryType = memoryType
 
+
 cdef class PitchedPtr:
 
     def __init__(self, size_t pitch, intptr_t ptr, size_t xsize, size_t ysize):
@@ -32,12 +33,14 @@ cdef class PitchedPtr:
         self.xsize = xsize
         self.ysize = ysize
 
+
 cdef class Pos:
 
     def __init__(self, size_t x, size_t y, size_t z):
         self.x = x
         self.y = y
         self.z = z
+
 
 cdef class Extent:
 
@@ -46,18 +49,21 @@ cdef class Extent:
         self.height = height
         self.width = width
 
+
 # cdef class Memcpy3DParms:
 
-#     def __init__(self,
+#     def __init__(self, driver.Array dstArray, _Pos dstPos, PitchedPtr dstPtr,
+#                  Extent extent, MemoryKind kind, driver.Array srcArray,
+#                  Pos srcPos, PitchedPtr srcPtr):
+#         self.dstArray = dstArray
+#         self.dstPos = dstPos
+#         self.dstPtr = dstPtr
+#         self.extent = extent
+#         self.kind = kind
+#         self.srcArray = srcArray
+#         self.srcPos = srcPos
+#         self.srcPtr = srcPtr
 
-#     #     cudaArray_t dstArray
-#     #     _Pos dstPos
-#     #     _PitchedPtr dstPtr
-#     #     _Extent extent
-#     #     MemoryKind kind
-#     #     cudaArray_t srcArray
-#     #     _Pos srcPos
-#     #     _PitchedPtr srcPtr
 
 ###############################################################################
 # Extern
@@ -97,15 +103,15 @@ cdef extern from "cupy_cuda.h" nogil:
         size_t height
         size_t width
 
-    # struct _Memcpy3DParms 'cudaMemcpy3DParms':
-    #     cudaArray_t dstArray
-    #     _Pos dstPos
-    #     _PitchedPtr dstPtr
-    #     _Extent extent
-    #     MemoryKind kind
-    #     cudaArray_t srcArray
-    #     _Pos srcPos
-    #     _PitchedPtr srcPtr
+    struct _Memcpy3DParms 'cudaMemcpy3DParms':
+        driver.Array dstArray
+        _Pos dstPos
+        _PitchedPtr dstPtr
+        _Extent extent
+        MemoryKind kind
+        driver.Array srcArray
+        _Pos srcPos
+        _PitchedPtr srcPtr
 
     # Error handling
     const char* cudaGetErrorName(Error error)
@@ -148,7 +154,7 @@ cdef extern from "cupy_cuda.h" nogil:
     int cudaMemcpy2D(void* dst, size_t dpitch, const void* src,
                      size_t spitch, size_t width, size_t height,
                      MemoryKind kind)
-    # int cudaMemcpy3D(_Memcpy3DParms* p)
+    int cudaMemcpy3D(_Memcpy3DParms* p)
     int cudaMemset(void* devPtr, int value, size_t count)
     int cudaMemsetAsync(void* devPtr, int value, size_t count,
                         driver.Stream stream)

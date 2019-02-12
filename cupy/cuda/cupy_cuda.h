@@ -62,6 +62,8 @@ struct CUfunc_st;
 struct CUmod_st;
 struct CUstream_st;
 struct CUlinkState_st;
+// struct CUarray_st; // GRL: needed?
+struct cudaArray;  // GRL: needed?
 
 
 typedef struct CUctx_st* CUcontext;
@@ -70,6 +72,7 @@ typedef struct CUfunc_st* CUfunction;
 typedef struct CUmod_st* CUmodule;
 typedef struct CUstream_st* cudaStream_t;
 typedef struct CUlinkState_st* CUlinkState;
+typedef struct cudaArray* cudaArray_t;
 
 // Error handling
 CUresult cuGetErrorName(...) {
