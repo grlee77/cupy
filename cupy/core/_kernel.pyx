@@ -36,7 +36,7 @@ cpdef inline bint _is_fusing() except? -1:
     return False
 
 
-cpdef _get_simple_elementwise_kernel(
+cpdef function.Function _get_simple_elementwise_kernel(
         params, operation, name, preamble,
         loop_prep='', after_loop='', options=()):
     module_code = string.Template('''
@@ -70,14 +70,13 @@ cdef inline int get_kind_score(int kind):
     return -1
 
 
-cpdef list _preprocess_args(args, bint use_c_scalar=False):
+cpdef list _preprocess_args(int dev_id, args, bint use_c_scalar):
     """Preprocesses arguments for kernel invocation
 
     - Checks device compatibility for ndarrays
     - Converts Python scalars into NumPy scalars
     """
     cdef list ret = []
-    cdef int dev_id = device.get_device_id()
     cdef type typ
 
     for arg in args:
@@ -521,7 +520,8 @@ cdef class ElementwiseKernel:
         n_args = len(args)
         if n_args != self.nin and n_args != self.nargs:
             raise TypeError('Wrong number of arguments for %s' % self.name)
-        args = _preprocess_args(args, True)
+        dev_id = device.get_device_id()
+        args = _preprocess_args(dev_id, args, True)
 
         values, shape = _broadcast(args, self.params, size != -1)
         in_args = values[:self.nin]
@@ -568,7 +568,7 @@ cdef class ElementwiseKernel:
         inout_args.append(indexer)
 
         args_info = _get_args_info(inout_args)
-        kern = self._get_elementwise_kernel(args_info, types)
+        kern = self._get_elementwise_kernel(dev_id, args_info, types)
         kern.linear_launch(indexer.size, inout_args, shared_mem=0,
                            block_max_size=128, stream=stream)
         return ret
@@ -585,9 +585,8 @@ cdef class ElementwiseKernel:
         return ret
 
     cpdef function.Function _get_elementwise_kernel(
-            self, tuple args_info, tuple types):
-        id = device.get_device_id()
-        key = (id, args_info, types)
+            self, int dev_id, tuple args_info, tuple types):
+        key = (dev_id, args_info, types)
         kern = self._kernel_memo.get(key, None)
         if kern is not None:
             return kern
@@ -598,10 +597,9 @@ cdef class ElementwiseKernel:
         return kern
 
 
-@util.memoize(for_each_device=True)
-def _get_ufunc_kernel(
-        in_types, out_types, routine, args_info, params, name, preamble,
-        loop_prep):
+cdef function.Function _get_ufunc_kernel(
+        tuple in_types, tuple out_types, routine, tuple args_info, params,
+        name, preamble, loop_prep):
     kernel_params = _get_kernel_params(params, args_info)
 
     types = []
@@ -677,7 +675,8 @@ cdef tuple _guess_routine(name, dict cache, list ops, list in_args, dtype):
     if dtype is None:
         use_raw_value = _check_should_use_min_scalar(in_args)
         if use_raw_value:
-            in_types = tuple(in_args)
+            in_types = tuple([i.dtype if isinstance(i, ndarray) else i
+                              for i in in_args])
             op = ()
         else:
             in_types = tuple([i.dtype.type for i in in_args])
@@ -701,17 +700,33 @@ cdef tuple _guess_routine(name, dict cache, list ops, list in_args, dtype):
                     (dtype, name))
 
 
-class ufunc(object):
+cdef class ufunc:
 
     """Universal function.
 
     Attributes:
         ~ufunc.name (str): The name of the universal function.
-        nin (int): Number of input arguments.
-        nout (int): Number of output arguments.
-        nargs (int): Number of all arguments.
+        ~ufunc.nin (int): Number of input arguments.
+        ~ufunc.nout (int): Number of output arguments.
+        ~ufunc.nargs (int): Number of all arguments.
 
     """
+
+    cdef:
+        readonly Py_ssize_t nin
+        readonly Py_ssize_t nout
+        readonly Py_ssize_t nargs
+        readonly object name
+        readonly list _ops
+        readonly object _preamble
+        readonly object _loop_prep
+        readonly object _default_casting
+        readonly tuple _params
+        readonly dict _routine_cache
+        readonly dict _kernel_memo
+        readonly object __doc__
+        readonly object __name__
+        readonly object __module__
 
     def __init__(self, name, nin, nout, ops, preamble='', loop_prep='', doc='',
                  default_casting=None):
@@ -737,6 +752,7 @@ class ufunc(object):
         self._params = _in_params + _out_params + (
             ParameterInfo('CIndexer _ind', False),)
         self._routine_cache = {}
+        self._kernel_memo = {}
 
     def __repr__(self):
         return "<ufunc '%s'>" % self.name
@@ -791,7 +807,8 @@ class ufunc(object):
         if n_args != self.nin and n_args != self.nargs:
             raise TypeError('Wrong number of arguments for %s' % self.name)
 
-        args = _preprocess_args(args)
+        dev_id = device.get_device_id()
+        args = _preprocess_args(dev_id, args, False)
         if out is None:
             in_args = args[:self.nin]
             out_args = args[self.nin:]
@@ -803,14 +820,14 @@ class ufunc(object):
                                  "a positional and keyword argument")
 
             in_args = list(args)
-            out_args = _preprocess_args((out,))
+            out_args = _preprocess_args(dev_id, (out,), False)
             args += out_args
 
         broad_values, shape = _broadcast_core(args)
 
-        in_types, out_types, routine = _guess_routine(
+        op = _guess_routine(
             self.name, self._routine_cache, self._ops, in_args, dtype)
-
+        in_types, out_types, routine = op
         out_args = _get_out_args(out_args, out_types, shape, casting)
         if self.nout == 1:
             ret = out_args[0]
@@ -831,12 +848,23 @@ class ufunc(object):
         inout_args.append(indexer)
         args_info = _get_args_info(inout_args)
 
-        kern = _get_ufunc_kernel(
-            in_types, out_types, routine, args_info,
-            self._params, self.name, self._preamble, self._loop_prep)
+        kern = self._get_ufunc_kernel(dev_id, op, args_info)
 
         kern.linear_launch(indexer.size, inout_args)
         return ret
+
+    cdef function.Function _get_ufunc_kernel(
+            self, int dev_id, tuple op, tuple args_info):
+        cdef function.Function kern
+        key = (dev_id, op, args_info)
+        kern = self._kernel_memo.get(key, None)
+        if kern is None:
+            in_types, out_types, routine = op
+            kern = _get_ufunc_kernel(
+                in_types, out_types, routine, args_info,
+                self._params, self.name, self._preamble, self._loop_prep)
+            self._kernel_memo[key] = kern
+        return kern
 
 
 cpdef create_ufunc(name, ops, routine=None, preamble='', doc='',
