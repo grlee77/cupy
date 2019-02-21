@@ -158,7 +158,6 @@ cdef extern from "cupy_cuda.h" nogil:
     int cudaFree(void* devPtr)
     int cudaFreeHost(void* ptr)
     int cudaMemGetInfo(size_t* free, size_t* total)
-
     int cudaMallocPitch(void** devPtr, size_t *pitch, size_t width, size_t height) nogil
     int cudaMallocArray(driver.Array* array, _ChannelFormatDesc* desc,
                         size_t width, size_t height, unsigned int flags) nogil
