@@ -5,20 +5,6 @@ from libc.stdint cimport intptr_t
 # Types
 ###############################################################################
 
-cdef class FuncAttributes:
-    cdef:
-        public size_t sharedSizeBytes
-        public size_t constSizeBytes
-        public size_t localSizeBytes
-        public int maxThreadsPerBlock
-        public int numRegs
-        public int ptxVersion
-        public int binaryVersion
-        public int cacheModeCA
-        public int maxDynamicSharedSizeBytes
-        public int preferredShmemCarveout
-
-
 cdef extern from *:
     ctypedef int Device 'CUdevice'
     ctypedef int Result 'CUresult'
@@ -62,7 +48,6 @@ cpdef enum:
     CU_MEMORYTYPE_ARRAY = 0x03
     CU_MEMORYTYPE_UNIFIED = 0x04
 
-
 ###############################################################################
 # Primary context management
 ###############################################################################
@@ -97,3 +82,9 @@ cpdef launchKernel(
     unsigned int block_dim_y, unsigned int block_dim_z,
     unsigned int shared_mem_bytes, size_t stream, intptr_t kernel_params,
     intptr_t extra)
+
+###############################################################################
+# Kernel attributes
+###############################################################################
+
+cpdef int funcGetAttribute(int attribute, intptr_t func)

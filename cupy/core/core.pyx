@@ -1237,9 +1237,15 @@ cdef class ndarray:
             return NotImplemented
 
     def __array_function__(self, func, types, args, kwargs):
-        if not hasattr(cupy, func.__name__):
+        module = cupy
+        for submodule in func.__module__.split('.')[1:]:
+            try:
+                module = getattr(module, submodule)
+            except AttributeError:
+                return NotImplemented
+        if not hasattr(module, func.__name__):
             return NotImplemented
-        cupy_func = getattr(cupy, func.__name__)
+        cupy_func = getattr(module, func.__name__)
         if cupy_func is func:
             # avoid NumPy func
             return NotImplemented
@@ -1365,7 +1371,7 @@ cdef class ndarray:
             else:
                 a_gpu = self
             a_cpu = numpy.empty(self._shape, dtype=self.dtype, order=order)
-        ptr = a_cpu.ctypes.get_as_parameter()
+        ptr = ctypes.c_void_p(a_cpu.__array_interface__['data'][0])
         if stream is not None:
             a_gpu.data.copy_to_host_async(ptr, a_gpu.nbytes, stream)
         else:
@@ -1402,7 +1408,7 @@ cdef class ndarray:
         else:
             raise RuntimeError('Cannot set to non-contiguous array')
 
-        ptr = arr.ctypes.get_as_parameter()
+        ptr = ctypes.c_void_p(arr.__array_interface__['data'][0])
         if stream is not None:
             self.data.copy_from_host_async(ptr, self.nbytes, stream)
         else:
@@ -1745,7 +1751,8 @@ cpdef ndarray array(obj, dtype=None, bint copy=True, order='K',
                 'This generally occurs because of insufficient host memory. '
                 'The original error was: {}'.format(nbytes, error),
                 util.PerformanceWarning)
-            a.data.copy_from_host(a_cpu.ctypes.get_as_parameter(), nbytes)
+            a.data.copy_from_host(
+                ctypes.c_void_p(a_cpu.__array_interface__['data'][0]), nbytes)
 
     return a
 
