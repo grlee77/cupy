@@ -5,20 +5,6 @@ from libc.stdint cimport intptr_t
 # Types
 ###############################################################################
 
-cdef class FuncAttributes:
-    cdef:
-        public size_t sharedSizeBytes
-        public size_t constSizeBytes
-        public size_t localSizeBytes
-        public int maxThreadsPerBlock
-        public int numRegs
-        public int ptxVersion
-        public int binaryVersion
-        public int cacheModeCA
-        public int maxDynamicSharedSizeBytes
-        public int preferredShmemCarveout
-
-
 cdef extern from *:
     ctypedef int Device 'CUdevice'
     ctypedef int Result 'CUresult'
@@ -101,4 +87,4 @@ cpdef launchKernel(
 # Kernel attributes
 ###############################################################################
 
-cpdef dict funcGetAttributes(size_t func)
+cpdef int funcGetAttribute(int attribute, intptr_t func)
