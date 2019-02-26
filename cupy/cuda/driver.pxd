@@ -62,7 +62,6 @@ cpdef enum:
     CU_MEMORYTYPE_ARRAY = 0x03
     CU_MEMORYTYPE_UNIFIED = 0x04
 
-
 ###############################################################################
 # Primary context management
 ###############################################################################
@@ -97,3 +96,9 @@ cpdef launchKernel(
     unsigned int block_dim_y, unsigned int block_dim_z,
     unsigned int shared_mem_bytes, size_t stream, intptr_t kernel_params,
     intptr_t extra)
+
+###############################################################################
+# Kernel attributes
+###############################################################################
+
+cpdef dict funcGetAttributes(size_t func)
