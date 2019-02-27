@@ -72,7 +72,7 @@ def _convert_fft_type(a, value_type):
 
 
 def _exec_fft(a, direction, value_type, norm, axis, overwrite_x,
-              out_size=None, out=None):
+              out_size=None, out=None, plan=None):
     fft_type = _convert_fft_type(a, value_type)
 
     if axis % a.ndim != a.ndim - 1:
@@ -108,8 +108,18 @@ def _exec_fft(a, direction, value_type, norm, axis, overwrite_x,
         if plan is None:
             plan = cufft.Plan1d(out_size, fft_type, batch)
             cache._cufft_cache.insert(plan, key)
-    else:
+    elif plan is None:
         plan = cufft.Plan1d(out_size, fft_type, batch)
+    else:
+        # check plan validity
+        if not isinstance(plan, cufft.Plan1d):
+            raise ValueError("expected plan to have type cufft.Plan1d")
+        if fft_type != plan.fft_type:
+            raise ValueError("CUFFT plan dtype mismatch.")
+        if out_size != plan.nx:
+            raise ValueError("Target array size does not match the plan.")
+        if batch != plan.batch:
+            raise ValueError("Batch size does not match the plan.")
 
     if overwrite_x and value_type == 'C2C':
         out = a
@@ -118,6 +128,7 @@ def _exec_fft(a, direction, value_type, norm, axis, overwrite_x,
         plan.check_output_array(a, out)
     else:
         out = plan.get_output_array(a)
+
     plan.fft(a, out, direction)
 
     sz = out.shape[-1]
@@ -135,18 +146,14 @@ def _exec_fft(a, direction, value_type, norm, axis, overwrite_x,
     return out
 
 
-def _fft_c2c(a, direction, norm, axes, overwrite_x):
+def _fft_c2c(a, direction, norm, axes, overwrite_x, plan=None):
     for axis in axes:
-        a = _exec_fft(a, direction, 'C2C', norm, axis, overwrite_x)
+        a = _exec_fft(a, direction, 'C2C', norm, axis, overwrite_x, plan=plan)
     return a
 
 
 def _fft(a, s, axes, norm, direction, value_type='C2C', overwrite_x=False,
          plan=None):
-    if plan is not None:
-        raise NotImplementedError("Use of a pre-existing plan is not currently"
-                                  " supported for 1D transforms.")
-
     if norm not in (None, 'ortho'):
         raise ValueError('Invalid norm value %s, should be None or \"ortho\".'
                          % norm)
@@ -170,7 +177,7 @@ def _fft(a, s, axes, norm, direction, value_type='C2C', overwrite_x=False,
     a = _cook_shape(a, s, axes, value_type)
 
     if value_type == 'C2C':
-        a = _fft_c2c(a, direction, norm, axes, overwrite_x)
+        a = _fft_c2c(a, direction, norm, axes, overwrite_x, plan=plan)
     elif value_type == 'R2C':
         a = _exec_fft(a, direction, value_type, norm, axes[-1], overwrite_x)
         a = _fft_c2c(a, direction, norm, axes[:-1], overwrite_x)
@@ -184,6 +191,56 @@ def _fft(a, s, axes, norm, direction, value_type='C2C', overwrite_x=False,
                       out_size)
 
     return a
+
+
+@cupy.util.memoize()
+def _prep_fftn_axes(ndim, s=None, axes=None, plan_nd_check=False):
+    """Configure axes argument for an n-dimensional FFT.
+
+    The axes to be transformed are returned in ascending order.
+    """
+    if axes is None:
+        if s is None:
+            dim = ndim
+        else:
+            dim = len(s)
+        axes = [i % ndim for i in six.moves.range(-dim, 0)]
+    elif np.isscalar(axes):
+        axes = (axes, )
+    axes = tuple(axes)
+
+    # compatibility checks for cupy.cuda.cufft.PlanNd
+    if (s is not None) and len(s) != len(axes):
+        raise ValueError("Shape and axes have different lengths.")
+
+    if np.min(axes) < -ndim or np.max(axes) > ndim - 1:
+        raise ValueError("The specified axes exceed the array dimensions.")
+
+    # sort the provided axes in ascending order
+    axes = tuple(sorted(np.mod(axes, ndim)))
+
+    if plan_nd_check:
+        if not np.all(np.diff(axes) == 1):
+            raise ValueError(
+                "The axes to be transformed must be contiguous and repeated "
+                "axes are not allowed.")
+        if (0 not in axes) and ((ndim - 1) not in axes):
+            raise ValueError(
+                "Either the first or the last axis of the array must be in "
+                "axes.")
+
+    # PlanNd supports 1D, 2D and 3D batch transforms over contiguous axes
+    if (len(axes) > 3 or
+            # PlanNd only possible if the first or last axis is in axes.
+            ((0 not in axes) and ((ndim - 1) not in axes)) or
+            # axes are not contiguous
+            not all([(axes[n + 1] - axes[n]) == 1
+                     for n in range(len(axes) - 1)])):
+        nd_plan_possible = False
+    else:
+        nd_plan_possible = True
+
+    return axes, nd_plan_possible
 
 
 def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
@@ -214,25 +271,8 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
         # transform over all axes
         fft_axes = tuple(range(ndim))
     else:
-        if np.isscalar(axes):
-            axes = (axes, )
-        axes = tuple(axes)
-
-        if np.min(axes) < -ndim or np.max(axes) > ndim - 1:
-            raise ValueError("The specified axes exceed the array dimensions.")
-
-        # sort the provided axes in ascending order
-        fft_axes = tuple(sorted(np.mod(axes, ndim)))
-
-        # make sure the specified axes meet the expectations made below
-        if not np.all(np.diff(fft_axes) == 1):
-            raise ValueError(
-                "The axes to be transformed must be contiguous and repeated "
-                "axes are not allowed.")
-        if (0 not in fft_axes) and ((ndim - 1) not in fft_axes):
-            raise ValueError(
-                "Either the first or the last axis of the array must be in "
-                "axes.")
+        fft_axes = _prep_fftn_axes(ndim, s=None, axes=axes,
+                                   plan_nd_check=True)[0]
 
     if len(fft_axes) < 1 or len(fft_axes) > 3:
         raise ValueError(
@@ -412,16 +452,7 @@ def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
                          % norm)
 
     a = _convert_dtype(a, value_type)
-    if axes is None:
-        dim = a.ndim
-        axes = [i for i in six.moves.range(-dim, 0)]
-    axes = tuple(axes)
-
-    if (s is not None) and len(s) != len(axes):
-        raise ValueError("Shape and axes have different lengths.")
-
-    # sort the provided axes in ascending order
-    axes = tuple(sorted(np.mod(axes, a.ndim)))
+    axes = _prep_fftn_axes(a.ndim, s, axes)[0]
 
     if order == 'A':
         if a.flags.f_contiguous:
@@ -445,30 +476,15 @@ def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
     return a
 
 
-def _default_plan_type(a, s=None, axes=None):
+def _default_plan_type(ndim, s=None, axes=None):
     """Determine whether to use separable 1d planning or nd planning."""
-    ndim = a.ndim
     if ndim == 1 or not config.enable_nd_planning:
         return '1d'
 
-    if axes is None:
-        if s is None:
-            dim = ndim
-        else:
-            dim = len(s)
-        axes = tuple([i % ndim for i in six.moves.range(-dim, 0)])
-    else:
-        # sort the provided axes in ascending order
-        axes = tuple(sorted([i % ndim for i in axes]))
-
-    if len(axes) == 1:
-        # use Plan1d to transform a single axis
-        return '1d'
-    elif len(axes) > 3 or not np.all(np.diff(axes) == 1):
-        # PlanNd supports 1d, 2d or 3d transforms over contiguous axes
-        return '1d'
-    if (0 not in axes) and ((ndim - 1) not in axes):
-        # PlanNd only possible if the first or last axis is in axes.
+    axes, nd_plan_possible = _prep_fftn_axes(ndim, s, axes,
+                                             plan_nd_check=False)
+    if len(axes) == 1 or not nd_plan_possible:
+        # prefer Plan1D in the 1D case
         return '1d'
     return 'nd'
 
@@ -476,8 +492,10 @@ def _default_plan_type(a, s=None, axes=None):
 def _default_fft_func(a, s=None, axes=None, plan=None):
     if isinstance(plan, cufft.PlanNd):  # a shortcut for using _fftn
         return _fftn
+    elif isinstance(plan, cufft.Plan1d):  # a shortcut for using _fft
+        return _fft
 
-    plan_type = _default_plan_type(a, s, axes)
+    plan_type = _default_plan_type(a.ndim, s, axes)
     if plan_type == 'nd':
         return _fftn
     else:
