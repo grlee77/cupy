@@ -1,59 +1,105 @@
 import numpy
 
+import cupy
+
 
 __all__ = ['clear', 'disable', 'enable', 'is_enabled', 'set_max_size']
 
-_cufft_cache = None
-_max_size_bytes = None
+# global dicts (with device id as the key)
+_cufft_cache = {}
+_max_size_bytes = {}
 
-# TODO: should have a _cufft_cache and _max_size_bytes per device?
 
+def enable(max_size_bytes=None, device_id=None):
+    """Enable the CUFFT plan cache.
 
-def enable(max_size_bytes=None):
-    """Enable the CUFFT plan cache."""
+    Args:
+        max_size_bytes (int or None): Maximum allowed size in bytes of the
+            cache.  If `None`, no size limit is enforced.
+        device_id (int or None): The device id. Default is the current device.
+    """
     global _cufft_cache
     global _max_size_bytes
 
-    if _cufft_cache is None:
-        _cufft_cache = _PlanCache(_max_size_bytes)
+    if device_id is None:
+        device_id = cupy.cuda.get_device_id()
+
+    _max_size_bytes[device_id] = max_size_bytes
+    if device_id not in _cufft_cache:
+        _cufft_cache[device_id] = _PlanCache(max_size_bytes)
 
 
-def disable():
-    """Disable the CUFFT plan cache."""
+def disable(device_id=None):
+    """Disable the CUFFT plan cache.
+
+    Args:
+        device_id (int or None): The device id. Default is the current device.
+    """
     global _cufft_cache
-    _cufft_cache = None
+
+    if device_id is None:
+        device_id = cupy.cuda.get_device_id()
+    _cufft_cache.pop(device_id, None)
 
 
-def is_enabled():
-    """Return whether the cache is currently enabled."""
-    if _cufft_cache is None:
-        return False
-    else:
+def is_enabled(device_id=None):
+    """Return whether the cache is currently enabled.
+
+    Args:
+        device_id (int or None): The device id. Default is the current device.
+
+    Returns:
+        enabled (bool): boolean indicating whether the cache is enabled.
+    """
+    if device_id is None:
+        device_id = cupy.cuda.get_device_id()
+    if device_id in _cufft_cache:
         return True
+    else:
+        return False
 
 
-def clear():
+def clear(device_id=None):
+    """Clear any cached CUFFT plans stored on the device.
+
+    Args:
+        device_id (int or None): The device id. Default is the current device.
+    """
+    global _cufft_cache
+
+    if device_id is None:
+        device_id = cupy.cuda.get_device_id()
+
     """Clear the CUFFT plan cache."""
-    if _cufft_cache is not None:
-        _cufft_cache.clear()
+    if device_id in _cufft_cache:
+        _cufft_cache[device_id].clear()
 
 
-def set_max_size(max_size_bytes):
-    """Set the size in bytes available for cached CUFFT plans.
+def set_max_size(max_size_bytes, device_id=None):
+    """Set the size in bytes available for cached CUFFT plans on a device.
 
-    If set to None, no limit is enforced.
+    Args:
+        max_size_bytes (int or None): Maximum allowed size in bytes of the
+            cache.  If `None`, no size limit is enforced.
+        device_id (int or None): The device id. Default is the current device.
+
     """
     global _max_size_bytes
 
-    _max_size_bytes = max_size_bytes
-    if _cufft_cache is not None:
-        _cufft_cache.max_size = max_size_bytes
-        if _cufft_cache._cached_size_bytes > max_size_bytes:
-            _cufft_cache.clear()
+    if device_id is None:
+        device_id = cupy.cuda.get_device_id()
+
+    _max_size_bytes[device_id] = max_size_bytes
+    if device_id in _cufft_cache:
+        _cufft_cache[device_id].max_size = max_size_bytes
+        if _cufft_cache[device_id]._cached_size_bytes > max_size_bytes:
+            _cufft_cache[device_id].clear()
 
 
 class _PlanCache(object):
     """Cache for CUFFT Plans.
+
+    Each device will have it's own, independent _PlanCache object.
 
     - Can store both cufft.Plan1d and cufft.PlanNd plans.
     - Can specify `max_size_bytes` to limit the total memory used by all stored

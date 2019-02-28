@@ -86,19 +86,19 @@ def _exec_fft(a, direction, value_type, norm, axis, overwrite_x,
 
     batch = a.size // a.shape[-1]
 
-    if cache.is_enabled():
+    device_id = cupy.cuda.device.get_device_id()
+    if cache.is_enabled(device_id):
         # CUFFT plans can only be safely used by the thread that created them
         thread_id = get_ident()
-        device_id = cupy.cuda.device.get_device_id()
 
         # Note: in the future, may need to add the stream here as well
-        key = (out_size, fft_type, batch, thread_id, device_id)
-        plan = cache._cufft_cache.lookup(key)
+        key = (out_size, fft_type, batch, thread_id)
+        plan = cache._cufft_cache[device_id].lookup(key)
 
     if plan is None:
         plan = cufft.Plan1d(out_size, fft_type, batch)
-        if cache.is_enabled():
-            cache._cufft_cache.insert(plan, key)
+        if cache.is_enabled(device_id):
+            cache._cufft_cache[device_id].insert(plan, key)
     else:
         # check plan validity
         if not isinstance(plan, cufft.Plan1d):
@@ -346,16 +346,18 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
                 "spatial axes).")
 
     plan = None
-    if cache.is_enabled():
+    device_id = cupy.cuda.device.get_device_id()
+    if cache.is_enabled(device_id):
         # CUFFT plans can only be safely used by the thread that created them
         thread_id = get_ident()
-        device_id = cupy.cuda.device.get_device_id()
 
         # Note: if user-defined stream supported is added to Plan1d in the
         # future, the stream should be added to the key as well.
-        key = (shape, istride, ostride, inembed, onembed, idist, odist,
-               fft_type, nbatch, thread_id, device_id)
-        plan = cache._cufft_cache.lookup(key)
+        key = (plan_dimensions, istride, ostride, inembed, onembed, idist,
+               odist, fft_type, nbatch, thread_id)
+        print(key)
+        plan = cache._cufft_cache[device_id].lookup(key)
+        print("plan = {}".format(plan))
 
     if plan is None:
         plan = cufft.PlanNd(shape=plan_dimensions,
@@ -367,8 +369,8 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
                             odist=odist,
                             fft_type=fft_type,
                             batch=nbatch)
-        if cache.is_enabled():
-            cache._cufft_cache.insert(plan, key)
+        if cache.is_enabled(device_id):
+            cache._cufft_cache[device_id].insert(plan, key)
 
     return plan
 
