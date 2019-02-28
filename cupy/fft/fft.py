@@ -89,9 +89,10 @@ def _exec_fft(a, direction, value_type, norm, axis, overwrite_x,
     if cache.is_enabled():
         # CUFFT plans can only be safely used by the thread that created them
         thread_id = get_ident()
+        device_id = cupy.cuda.device.get_device_id()
 
         # Note: in the future, may need to add the stream here as well
-        key = (out_size, fft_type, batch, thread_id)
+        key = (out_size, fft_type, batch, thread_id, device_id)
         plan = cache._cufft_cache.lookup(key)
 
     if plan is None:
@@ -348,11 +349,12 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
     if cache.is_enabled():
         # CUFFT plans can only be safely used by the thread that created them
         thread_id = get_ident()
+        device_id = cupy.cuda.device.get_device_id()
 
         # Note: if user-defined stream supported is added to Plan1d in the
         # future, the stream should be added to the key as well.
         key = (shape, istride, ostride, inembed, onembed, idist, odist,
-               fft_type, nbatch, thread_id)
+               fft_type, nbatch, thread_id, device_id)
         plan = cache._cufft_cache.lookup(key)
 
     if plan is None:
