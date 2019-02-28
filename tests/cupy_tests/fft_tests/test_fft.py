@@ -152,7 +152,7 @@ class TestDefaultPlanType(unittest.TestCase):
         # test cases where nd CUFFT plan is possible
         ca = cupy.ones((16, 16, 16))
         for axes in [(0, 1), (1, 2), None, (0, 1, 2)]:
-            plan_type = _default_plan_type(ca, axes=axes)
+            plan_type = _default_plan_type(ca.ndim, axes=axes)
             if enable_nd:
                 self.assertEqual(plan_type, 'nd')
             else:
@@ -160,17 +160,17 @@ class TestDefaultPlanType(unittest.TestCase):
 
         # only a single axis is transformed -> 1d plan preferred
         for axes in [(0, ), (1, ), (2, )]:
-            self.assertEqual(_default_plan_type(ca, axes=axes), '1d')
+            self.assertEqual(_default_plan_type(ca.ndim, axes=axes), '1d')
 
         # non-contiguous axes -> nd plan not possible
-        self.assertEqual(_default_plan_type(ca, axes=(0, 2)), '1d')
+        self.assertEqual(_default_plan_type(ca.ndim, axes=(0, 2)), '1d')
 
         # >3 axes transformed -> nd plan not possible
         ca = cupy.ones((2, 4, 6, 8))
-        self.assertEqual(_default_plan_type(ca), '1d')
+        self.assertEqual(_default_plan_type(ca.ndim), '1d')
 
         # first or last axis not included -> nd plan not possible
-        self.assertEqual(_default_plan_type(ca, axes=(1, )), '1d')
+        self.assertEqual(_default_plan_type(ca.ndim, axes=(1, )), '1d')
 
 
 @testing.gpu
@@ -321,7 +321,7 @@ class TestFftnContiguity(unittest.TestCase):
                 a = cupy.asfortranarray(a)
             out = cupy.fft.fftn(a, s=self.s, axes=self.axes)
 
-            plan_type = _default_plan_type(a, s=self.s, axes=self.axes)
+            plan_type = _default_plan_type(a.ndim, s=self.s, axes=self.axes)
             if plan_type == 'nd':
                 # nd plans have output with contiguity matching the input
                 self.assertEqual(out.flags.c_contiguous, a.flags.c_contiguous)
@@ -340,7 +340,7 @@ class TestFftnContiguity(unittest.TestCase):
                 a = cupy.asfortranarray(a)
             out = cupy.fft.ifftn(a, s=self.s, axes=self.axes)
 
-            plan_type = _default_plan_type(a, s=self.s, axes=self.axes)
+            plan_type = _default_plan_type(a.ndim, s=self.s, axes=self.axes)
             if plan_type == 'nd':
                 # nd plans have output with contiguity matching the input
                 self.assertEqual(out.flags.c_contiguous, a.flags.c_contiguous)
