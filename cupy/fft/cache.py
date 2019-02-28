@@ -1,12 +1,13 @@
 import numpy
 
 
-__all__ = ['enable', 'disable', 'set_max_size_bytes']
+__all__ = ['clear', 'disable', 'enable', 'is_enabled', 'set_max_size']
 
 _cufft_cache = None
 _max_size_bytes = None
 
 # TODO: should have a _cufft_cache and _max_size_bytes per device?
+
 
 def enable(max_size_bytes=None):
     """Enable the CUFFT plan cache."""
@@ -15,18 +16,6 @@ def enable(max_size_bytes=None):
 
     if _cufft_cache is None:
         _cufft_cache = _PlanCache(_max_size_bytes)
-
-
-def set_max_size_bytes(max_size_bytes):
-    """Set the size in bytes available for cached CUFFT plans.
-
-    If set to None, no limit is enforced.
-    """
-    global _max_size_bytes
-
-    _max_size_bytes = max_size_bytes
-    if _cufft_cache is not None:
-        _cufft_cache.max_size_bytes = max_size_bytes
 
 
 def disable():
@@ -41,6 +30,26 @@ def is_enabled():
         return False
     else:
         return True
+
+
+def clear():
+    """Clear the CUFFT plan cache."""
+    if _cufft_cache is not None:
+        _cufft_cache.clear()
+
+
+def set_max_size(max_size_bytes):
+    """Set the size in bytes available for cached CUFFT plans.
+
+    If set to None, no limit is enforced.
+    """
+    global _max_size_bytes
+
+    _max_size_bytes = max_size_bytes
+    if _cufft_cache is not None:
+        _cufft_cache.max_size = max_size_bytes
+        if _cufft_cache._cached_size_bytes > max_size_bytes:
+            _cufft_cache.clear()
 
 
 class _PlanCache(object):

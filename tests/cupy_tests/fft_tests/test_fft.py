@@ -135,13 +135,53 @@ class TestFftOrder(CachedTestCase):
 
 
 @testing.gpu
-class TestFftCacheEnableDisable(CachedTestCase):
+class TestFftCache(CachedTestCase):
+
+    def num_cached(self):
+        return len(list(cache._cufft_cache._cache_dict.keys()))
 
     def test_cache_is_enabled(self):
         assert cache.is_enabled()
 
         cache.disable()
         assert not cache.is_enabled()
+
+    def test_basic(self):
+        cache.clear()
+        assert self.num_cached() == 0
+
+        cupy.fft.fft(cupy.arange(16))
+        assert self.num_cached() == 1
+        cupy.fft.fft(cupy.arange(15))
+        assert self.num_cached() == 2
+
+        # duplicate transform does not increase the cache size
+        cupy.fft.fft(cupy.arange(16))
+        assert self.num_cached() == 2
+
+        # fftn plans get cached as well
+        cupy.fft.fftn(cupy.ones((16, 16)))
+        assert self.num_cached() == 3
+
+        cache.clear()
+        assert self.num_cached() == 0
+
+    def test_max_size(self):
+        cache.clear()
+        cache.set_max_size(1024)  # 1k plan size limit
+
+        # plan with size exceeding max_size does not get added to the cache
+        cupy.fft.fft(cupy.arange(512))
+        assert self.num_cached() == 0
+
+        # can add a very small plan
+        cupy.fft.fft(cupy.arange(16., dtype=np.float32))
+        assert self.num_cached() == 1
+
+        # If new max size is smaller than the existing cached plans, the cache
+        # is cleared.
+        cache.set_max_size(8)
+        assert self.num_cached() == 0
 
 
 @testing.gpu
