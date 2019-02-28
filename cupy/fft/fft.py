@@ -1,4 +1,5 @@
 from copy import copy
+from threading import get_ident
 
 import six
 
@@ -7,6 +8,7 @@ import numpy as np
 import cupy
 from cupy.cuda import cufft
 from math import sqrt
+from cupy.fft import cache
 from cupy.fft import config
 
 
@@ -83,8 +85,19 @@ def _exec_fft(a, direction, value_type, norm, axis, overwrite_x,
         out_size = a.shape[-1]
 
     batch = a.size // a.shape[-1]
+
+    if cache.is_enabled():
+        # CUFFT plans can only be safely used by the thread that created them
+        thread_id = get_ident()
+
+        # Note: in the future, may need to add the stream here as well
+        key = (out_size, fft_type, batch, thread_id)
+        plan = cache._cufft_cache.lookup(key)
+
     if plan is None:
         plan = cufft.Plan1d(out_size, fft_type, batch)
+        if cache.is_enabled():
+            cache._cufft_cache.insert(plan, key)
     else:
         # check plan validity
         if not isinstance(plan, cufft.Plan1d):
@@ -298,15 +311,30 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
                 "GPU case (Can only batch FFT over the first or last "
                 "spatial axes).")
 
-    plan = cufft.PlanNd(shape=plan_dimensions,
-                        istride=istride,
-                        ostride=ostride,
-                        inembed=inembed,
-                        onembed=onembed,
-                        idist=idist,
-                        odist=odist,
-                        fft_type=fft_type,
-                        batch=nbatch)
+    plan = None
+    if cache.is_enabled():
+        # CUFFT plans can only be safely used by the thread that created them
+        thread_id = get_ident()
+
+        # Note: if user-defined stream supported is added to Plan1d in the
+        # future, the stream should be added to the key as well.
+        key = (shape, istride, ostride, inembed, onembed, idist, odist,
+               fft_type, nbatch, thread_id)
+        plan = cache._cufft_cache.lookup(key)
+
+    if plan is None:
+        plan = cufft.PlanNd(shape=plan_dimensions,
+                            istride=istride,
+                            ostride=ostride,
+                            inembed=inembed,
+                            onembed=onembed,
+                            idist=idist,
+                            odist=odist,
+                            fft_type=fft_type,
+                            batch=nbatch)
+        if cache.is_enabled():
+            cache._cufft_cache.insert(plan, key)
+
     return plan
 
 
