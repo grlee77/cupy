@@ -618,7 +618,7 @@ def fftn(a, s=None, axes=None, norm=None, plan_type=None, plan=None, out=None):
     .. seealso:: :func:`numpy.fft.fftn`
     """
     if plan_type is None:
-        plan_type = _default_plan_type(a, s, axes)
+        plan_type = _default_plan_type(a.ndim, s, axes)
     if plan_type == 'nd':
         return _fftn(a, s, axes, norm, cufft.CUFFT_FORWARD, plan=plan, out=out)
     else:
@@ -666,7 +666,7 @@ def ifftn(a, s=None, axes=None, norm=None, plan_type=None, plan=None,
     .. seealso:: :func:`numpy.fft.ifftn`
     """
     if plan_type is None:
-        plan_type = _default_plan_type(a, s, axes)
+        plan_type = _default_plan_type(a.ndim, s, axes)
     if plan_type == 'nd':
         return _fftn(a, s, axes, norm, cufft.CUFFT_INVERSE, plan=plan, out=out)
     else:
