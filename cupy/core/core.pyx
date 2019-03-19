@@ -237,7 +237,7 @@ cdef class ndarray:
         if self.ndim < 2:
             return self
         else:
-            return _manipulation._transpose(self, vector.vector[Py_ssize_t]())
+            return _manipulation._T(self)
 
     __array_priority__ = 100
 
@@ -423,8 +423,13 @@ cdef class ndarray:
         finally:
             runtime.setDevice(dev_id)
         newarray = ndarray(x.shape, dtype=x.dtype)
+        if not x._c_contiguous and not x._f_contiguous:
+            raise NotImplementedError(
+                'CuPy cannot copy non-contiguous array between devices.')
         # TODO(niboshi): Confirm update_x_contiguity flags
-        newarray._set_shape_and_strides(x._shape, x._strides, True, True)
+        newarray._strides = x._strides
+        newarray._c_contiguous = x._c_contiguous
+        newarray._f_contiguous = x._f_contiguous
         newarray.data.copy_from_device(x.data, x.nbytes)
         return newarray
 
