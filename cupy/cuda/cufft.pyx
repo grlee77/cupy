@@ -5,6 +5,7 @@ import cupy
 from cupy.cuda cimport driver
 from cupy.cuda cimport memory
 from cupy.cuda cimport stream as stream_module
+from cupy.cuda.runtime cimport DataType
 
 
 cdef extern from 'cupy_cufft.h' nogil:
@@ -30,7 +31,13 @@ cdef extern from 'cupy_cufft.h' nogil:
                              int istride, int idist, int *onembed, int ostride,
                              int odist, Type type, int batch,
                              size_t *workSize)
-
+    Result cufftXtMakePlanMany(Handle plan, int rank, long long int *n,
+                               long long int *inembed, long long int istride,
+                               long long int idist, DataType inputtype,
+                               long long int *onembed, long long int ostride,
+                               long long int odist, DataType outputtype,
+                               long long int batch, size_t *workSize,
+                               DataType executiontype);
     # cuFFT Exec Function
     Result cufftExecC2C(Handle plan, Complex *idata, Complex *odata,
                         int direction)
