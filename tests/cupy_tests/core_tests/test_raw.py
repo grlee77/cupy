@@ -1,5 +1,7 @@
 import unittest
 
+import pytest
+
 import cupy
 
 
@@ -42,3 +44,27 @@ class TestRaw(unittest.TestCase):
         assert attributes['numRegs'] > 0
         assert attributes['maxThreadsPerBlock'] > 0
         assert attributes['sharedSizeBytes'] == 0
+
+    def test_set_max_dynamic_shared_size_bytes(self):
+        current_dynamic_mem = self.kern.attributes['maxDynamicSharedSizeBytes']
+        # don't try to set on hardware when the attribute is undefined (-1)
+        if current_dynamic_mem >= 0:
+            new_dynamic_mem = current_dynamic_mem // 2
+            self.kern.set_max_dynamic_shared_size_bytes(new_dynamic_mem)
+            updated_val = self.kern.attributes['maxDynamicSharedSizeBytes']
+            assert updated_val == new_dynamic_mem
+
+    def test_set_preferred_shmem_carveout(self):
+        current_percentage = self.kern.attributes['preferredShmemCarveout']
+        # don't try to set on hardware when the attribute is undefined (-1)
+        if current_percentage >= 0:
+            new_percentage = 50
+            self.kern.set_preferred_shmem_carveout(new_percentage)
+            updated_val = self.kern.attributes['preferredShmemCarveout']
+            assert updated_val == new_percentage
+
+        # ValueError for percentages outside of the range [0, 100]
+        with pytest.raises(ValueError):
+            self.kern.set_preferred_shmem_carveout(-1)
+        with pytest.raises(ValueError):
+            self.kern.set_preferred_shmem_carveout(101)

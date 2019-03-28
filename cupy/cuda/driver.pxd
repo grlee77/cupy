@@ -88,3 +88,4 @@ cpdef launchKernel(
 ###############################################################################
 
 cpdef int funcGetAttribute(int attribute, intptr_t func)
+cpdef funcSetAttribute(intptr_t func, int attribute, int value)

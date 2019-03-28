@@ -64,6 +64,41 @@ cdef class RawKernel:
         kern = _get_raw_kernel(self.code, self.name, self.options)
         return _get_func_attributes(kern.ptr)
 
+    def set_max_dynamic_shared_size_bytes(self, bytes):
+        """Sets the maxDynamicSharedSizeBytes attribute of a kernel.
+
+        Returns:
+            bytes (int): The number of bytes to allocate toward shared memory.
+        """
+        kern = _get_raw_kernel(self.code, self.name, self.options)
+        driver.funcSetAttribute(
+            kern.ptr,
+            driver.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+            int(bytes))
+
+    def set_preferred_shmem_carveout(self, percentage):
+        """Sets the preferredShmemCarveout attribute of a kernel.
+
+        This attribute controls the percentage of resources allocated to shared
+        memory for devices that share hardware resources shared between the L1
+        cache and shared memory. A value of 0 corresponds to giving preference
+        to L1 cache, while a value of 100 corresponds to giving preference to
+        shared memory.
+
+        Returns:
+            percentage (int): The shared memory carvout limit as a percentage
+                (range [0-100]).
+        """
+        kern = _get_raw_kernel(self.code, self.name, self.options)
+        if percentage < 0 or percentage > 100:
+            raise ValueError(
+                "The shared memory carevout percentage must be a value "
+                "between 0 and 100.")
+        driver.funcSetAttribute(
+            kern.ptr,
+            driver.CU_FUNC_ATTRIBUTE_PREFERRED_SHARED_MEMORY_CARVEOUT,
+            int(percentage))
+
 
 @cupy.util.memoize(for_each_device=True)
 def _get_raw_kernel(code, name, options=()):
@@ -72,7 +107,7 @@ def _get_raw_kernel(code, name, options=()):
     return module.get_function(name)
 
 
-@cupy.util.memoize(for_each_device=True)
+# Note: not using memoize because some attributes can be set dynamically
 def _get_func_attributes(func):
     cdef:
         int sharedSizeBytes, constSizeBytes, localSizeBytes
