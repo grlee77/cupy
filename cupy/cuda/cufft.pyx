@@ -31,13 +31,7 @@ cdef extern from 'cupy_cufft.h' nogil:
                              int istride, int idist, int *onembed, int ostride,
                              int odist, Type type, int batch,
                              size_t *workSize)
-    Result cufftXtMakePlanMany(Handle plan, int rank, long long int *n,
-                               long long int *inembed, long long int istride,
-                               long long int idist, DataType inputtype,
-                               long long int *onembed, long long int ostride,
-                               long long int odist, DataType outputtype,
-                               long long int batch, size_t *workSize,
-                               DataType executiontype);
+
     # cuFFT Exec Function
     Result cufftExecC2C(Handle plan, Complex *idata, Complex *odata,
                         int direction)
@@ -47,6 +41,20 @@ cdef extern from 'cupy_cufft.h' nogil:
                         DoubleComplex *odata, int direction)
     Result cufftExecD2Z(Handle plan, Double *idata, DoubleComplex *odata)
     Result cufftExecZ2D(Handle plan, DoubleComplex *idata, Double *odata)
+
+
+cdef extern from 'cupy_cufftXt.h' nogil:
+    Result cufftXtMakePlanMany(Handle plan, int rank, long long int *n,
+                               long long int *inembed, long long int istride,
+                               long long int idist, DataType inputtype,
+                               long long int *onembed, long long int ostride,
+                               long long int odist, DataType outputtype,
+                               long long int batch, size_t *workSize,
+                               DataType executiontype);
+
+    Result cufftXtSetWorkAreaPolicy(Handle plan,
+                                    WorkAreaPolicy policy,
+                                    size_t *workSize);
 
 
 cdef dict RESULT = {
@@ -184,7 +192,7 @@ class Plan1d(object):
 class PlanNd(object):
     def __init__(self, object shape, object inembed, int istride,
                  int idist, object onembed, int ostride, int odist,
-                 int fft_type, int batch):
+                 int fft_type, int batch, int policy=CUFFT_WORKAREA_PERFORMANCE):
         cdef Handle plan
         cdef size_t work_size
         cdef int ndim, i
@@ -234,7 +242,8 @@ class PlanNd(object):
         check_result(result)
 
         # TODO: for CUDA>=9.2 could also allow setting a work area policy
-        # result = cufftXtSetWorkAreaPolicy(plan, policy, &work_size)
+        result = cufftXtSetWorkAreaPolicy(plan, <WorkAreaPolicy>policy,
+                                          &work_size)
 
         work_area = memory.alloc(work_size)
         with nogil:

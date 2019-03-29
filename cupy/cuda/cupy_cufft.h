@@ -5,6 +5,7 @@
 
 #ifndef CUPY_NO_CUDA
 #  include <cufft.h>
+#  include <cufftXt.h>
 
 #else  // CUPY_NO_CUDA
 extern "C" {
@@ -43,6 +44,8 @@ typedef enum {
 typedef int cufftHandle;
 
 typedef enum {} cufftType_t;
+
+typedef enum {} cufftXtWorkAreaPolicy_t;
 
 // cuFFT Helper Function
 cufftResult_t cufftCreate(...) {
