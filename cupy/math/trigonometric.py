@@ -114,6 +114,7 @@ def _unwrap_correct(dd, discont):
 
 def unwrap(p, discont=numpy.pi, axis=-1):
     """Unwrap by changing deltas between values to 2*pi complement.
+    
     Args:
         p (cupy.ndarray): Input array.
         discont (float): Maximum discontinuity between values, default is
@@ -122,6 +123,7 @@ def unwrap(p, discont=numpy.pi, axis=-1):
             axis.
     Returns:
         cupy.ndarray: The result array.
+
     .. seealso:: :func:`numpy.unwrap`
     """
 
