@@ -162,6 +162,8 @@ CUresult cuFuncSetAttribute(...) {
 
 typedef enum {
     cudaSuccess = 0,
+    cudaErrorInvalidValue = 1,
+    cudaErrorMemoryAllocation = 2,
 } cudaError_t;
 typedef enum {} cudaDataType;
 enum cudaDeviceAttr {};
@@ -270,6 +272,14 @@ cudaError_t cudaMalloc(...) {
 }
 
 cudaError_t cudaHostAlloc(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaHostRegister(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaHostUnregister(...) {
     return cudaSuccess;
 }
 
