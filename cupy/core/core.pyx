@@ -1902,11 +1902,11 @@ template<typename T> __device__ T pow10(long long n){
 
 cdef _round_float = '''
 if (in1 == 0) {
-    out0 = round(in0);
+    out0 = rint(in0);
 } else {
     double x;
     x = pow10<double>(abs(in1));  // TODO(okuta): Move before loop
-    out0 = in1 < 0 ? round(in0 / x) * x : round(in0 * x) / x;
+    out0 = in1 < 0 ? rint(in0 / x) * x : rint(in0 * x) / x;
 }'''
 
 cdef _round_complex = '''
@@ -1922,8 +1922,8 @@ if (in1 == 0) {
         inv_x = y;
     }
 }
-out0 = in0_type(round(in0.real() * x) * inv_x,
-                round(in0.imag() * x) * inv_x);'''
+out0 = in0_type(rint(in0.real() * x) * inv_x,
+                rint(in0.imag() * x) * inv_x);'''
 
 
 _round_ufunc = create_ufunc(
