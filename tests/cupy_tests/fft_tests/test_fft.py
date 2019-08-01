@@ -6,7 +6,7 @@ import numpy as np
 import cupy
 from cupy.fft import cache
 from cupy.fft import config
-from cupy.fft.fft import _default_plan_type
+from cupy.fft.fft import _default_plan_type, _get_cufft_plan_nd
 
 from cupy import testing
 
@@ -443,7 +443,7 @@ class TestFftnPlanNd(unittest.TestCase):
             else:
                 fft_type = cupy.cuda.cufft.CUFFT_Z2Z
 
-            plan = cupy.fft.get_cufft_plan_nd(
+            plan = _get_cufft_plan_nd(
                 out_shape, fft_type=fft_type, axes=self.axes,
                 order='C')
 
@@ -471,7 +471,7 @@ class TestFftnPlanNd(unittest.TestCase):
             else:
                 fft_type = cupy.cuda.cufft.CUFFT_Z2Z
 
-            plan = cupy.fft.get_cufft_plan_nd(
+            plan = _get_cufft_plan_nd(
                 out_shape, fft_type=fft_type, axes=self.axes,
                 order='C')
 
