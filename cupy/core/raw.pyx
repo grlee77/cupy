@@ -49,99 +49,133 @@ cdef class RawKernel:
                 bytes.
 
         """
-        kern = _get_raw_kernel(self.code, self.name, self.options)
-        kern(grid, block, args, **kwargs)
+        self.kernel(grid, block, args, **kwargs)
+
+    @property
+    def kernel(self):
+        return _get_raw_kernel(self.code, self.name, self.options)
 
     @property
     def attributes(self):
-        """Returns an object containing runtime kernel attributes.
+        """Returns a dictionary containing runtime kernel attributes. This is
+        a read-only property; to overwrite the attributes, use
+
+        .. code-block:: python
+
+            kernel = RawKernel(...)  # arguments omitted
+            kernel.max_dynamic_shared_size_bytes = ...
+            kernel.preferred_shared_memory_carveout = ...
+
+        Note that the two attributes shown in the above example are the only
+        two currently settable in CUDA.
+
+        Any attribute not existing in the present CUDA toolkit version will
+        have the value -1.
 
         Returns:
-            attributes (FuncAttributes): A python class containing the
-                kernel's attributes. For example, ``attributes.numRegs``
-                corresponds to the number of registers used by the kernel.
+            dict: A dictionary containing the kernel's attributes.
         """
-        kern = _get_raw_kernel(self.code, self.name, self.options)
-        return _get_func_attributes(kern.ptr)
+        cdef dict attrs = {}
+        cdef list keys = ['max_threads_per_block', 'shared_size_bytes',
+                          'const_size_bytes', 'local_size_bytes',
+                          'num_regs', 'ptx_version', 'binary_version',
+                          'cache_mode_ca', 'max_dynamic_shared_size_bytes',
+                          'preferred_shared_memory_carveout']
+        for attr in keys:
+            attrs[attr] = getattr(self, attr)
+        return attrs
 
-    def set_max_dynamic_shared_size_bytes(self, bytes):
-        """Sets the maxDynamicSharedSizeBytes attribute of a kernel.
-
-        Returns:
-            bytes (int): The number of bytes to allocate toward shared memory.
+    @property
+    def max_threads_per_block(self):
+        """The maximum number of threads per block that can successfully
+        launch the function on the device.
         """
-        kern = _get_raw_kernel(self.code, self.name, self.options)
-        driver.funcSetAttribute(
-            kern.ptr,
-            driver.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
-            int(bytes))
+        attr = driver.CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK
+        return driver.funcGetAttribute(attr, self.kernel.ptr)
 
-    def set_preferred_shmem_carveout(self, percentage):
-        """Sets the preferredShmemCarveout attribute of a kernel.
-
-        This attribute controls the percentage of resources allocated to shared
-        memory for devices that share hardware resources shared between the L1
-        cache and shared memory. A value of 0 corresponds to giving preference
-        to L1 cache, while a value of 100 corresponds to giving preference to
-        shared memory.
-
-        Returns:
-            percentage (int): The shared memory carvout limit as a percentage
-                (range [0-100]).
+    @property
+    def shared_size_bytes(self):
+        """The size in bytes of the statically-allocated shared memory
+        used by the function. This is separate from any dynamically-allocated
+        shared memory, which must be specified when the function is called.
         """
-        kern = _get_raw_kernel(self.code, self.name, self.options)
-        if percentage < 0 or percentage > 100:
-            raise ValueError(
-                "The shared memory carevout percentage must be a value "
-                "between 0 and 100.")
-        driver.funcSetAttribute(
-            kern.ptr,
-            driver.CU_FUNC_ATTRIBUTE_PREFERRED_SHARED_MEMORY_CARVEOUT,
-            int(percentage))
+        attr = driver.CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES
+        return driver.funcGetAttribute(attr, self.kernel.ptr)
+
+    @property
+    def const_size_bytes(self):
+        """The size in bytes of constant memory used by the function."""
+        attr = driver.CU_FUNC_ATTRIBUTE_CONST_SIZE_BYTES
+        return driver.funcGetAttribute(attr, self.kernel.ptr)
+
+    @property
+    def local_size_bytes(self):
+        """The size in bytes of local memory used by the function."""
+        attr = driver.CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES
+        return driver.funcGetAttribute(attr, self.kernel.ptr)
+
+    @property
+    def num_regs(self):
+        """The number of registers used by the function."""
+        attr = driver.CU_FUNC_ATTRIBUTE_NUM_REGS
+        return driver.funcGetAttribute(attr, self.kernel.ptr)
+
+    @property
+    def ptx_version(self):
+        """The PTX virtual architecture version that was used during
+        compilation, in the format: 10*major + minor.
+        """
+        attr = driver.CU_FUNC_ATTRIBUTE_PTX_VERSION
+        return driver.funcGetAttribute(attr, self.kernel.ptr)
+
+    @property
+    def binary_version(self):
+        """The binary architecture version that was used during compilation,
+        in the format: 10*major + minor.
+        """
+        attr = driver.CU_FUNC_ATTRIBUTE_BINARY_VERSION
+        return driver.funcGetAttribute(attr, self.kernel.ptr)
+
+    @property
+    def cache_mode_ca(self):
+        """Indicates whether option "-Xptxas --dlcm=ca" was set during
+        compilation.
+        """
+        attr = driver.CU_FUNC_ATTRIBUTE_CACHE_MODE_CA
+        return driver.funcGetAttribute(attr, self.kernel.ptr)
+
+    @property
+    def max_dynamic_shared_size_bytes(self):
+        """The maximum dynamically-allocated shared memory size in bytes that
+        can be used by the function. Can be set.
+        """
+        attr = driver.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES
+        return driver.funcGetAttribute(attr, self.kernel.ptr)
+
+    @max_dynamic_shared_size_bytes.setter
+    def max_dynamic_shared_size_bytes(self, bytes):
+        attr = driver.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES
+        driver.funcSetAttribute(self.kernel.ptr, attr, bytes)
+
+    @property
+    def preferred_shared_memory_carveout(self):
+        """On devices that have a unified L1 cache and shared memory,
+        indicates the fraction to be used for shared memory as a
+        `percentage` of the total. If the fraction does not exactly equal a
+        supported shared memory capacity, then the next larger supported
+        capacity is used. Can be set.
+        """
+        attr = driver.CU_FUNC_ATTRIBUTE_PREFERRED_SHARED_MEMORY_CARVEOUT
+        return driver.funcGetAttribute(attr, self.kernel.ptr)
+
+    @preferred_shared_memory_carveout.setter
+    def preferred_shared_memory_carveout(self, fraction):
+        attr = driver.CU_FUNC_ATTRIBUTE_PREFERRED_SHARED_MEMORY_CARVEOUT
+        driver.funcSetAttribute(self.kernel.ptr, attr, fraction)
 
 
 @cupy.util.memoize(for_each_device=True)
 def _get_raw_kernel(code, name, options=()):
-    module = cupy.core.core.compile_with_cache(
-        code, options, prepend_cupy_headers=False)
+    module = cupy.core.core.compile_with_cache(code, options,
+                                               prepend_cupy_headers=False)
     return module.get_function(name)
-
-
-# Note: not using memoize because some attributes can be set dynamically
-def _get_func_attributes(func):
-    cdef:
-        int sharedSizeBytes, constSizeBytes, localSizeBytes
-        int maxThreadsPerBlock, numRegs, ptxVersion, binaryVersion
-        int cacheModeCA, maxDynamicSharedSizeBytes, preferredShmemCarveout
-
-    sharedSizeBytes = driver.funcGetAttribute(
-        driver.CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, func)
-    constSizeBytes = driver.funcGetAttribute(
-        driver.CU_FUNC_ATTRIBUTE_CONST_SIZE_BYTES, func)
-    localSizeBytes = driver.funcGetAttribute(
-        driver.CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES, func)
-    maxThreadsPerBlock = driver.funcGetAttribute(
-        driver.CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, func)
-    numRegs = driver.funcGetAttribute(
-        driver.CU_FUNC_ATTRIBUTE_NUM_REGS, func)
-    ptxVersion = driver.funcGetAttribute(
-        driver.CU_FUNC_ATTRIBUTE_PTX_VERSION, func)
-    binaryVersion = driver.funcGetAttribute(
-        driver.CU_FUNC_ATTRIBUTE_BINARY_VERSION, func)
-    cacheModeCA = driver.funcGetAttribute(
-        driver.CU_FUNC_ATTRIBUTE_CACHE_MODE_CA, func)
-    maxDynamicSharedSizeBytes = driver.funcGetAttribute(
-        driver.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, func)
-    preferredShmemCarveout = driver.funcGetAttribute(
-        driver.CU_FUNC_ATTRIBUTE_PREFERRED_SHARED_MEMORY_CARVEOUT, func)
-
-    return dict(sharedSizeBytes=sharedSizeBytes,
-                constSizeBytes=constSizeBytes,
-                localSizeBytes=localSizeBytes,
-                maxThreadsPerBlock=maxThreadsPerBlock,
-                numRegs=numRegs,
-                ptxVersion=ptxVersion,
-                binaryVersion=binaryVersion,
-                cacheModeCA=cacheModeCA,
-                maxDynamicSharedSizeBytes=maxDynamicSharedSizeBytes,
-                preferredShmemCarveout=preferredShmemCarveout)

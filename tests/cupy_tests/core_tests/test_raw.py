@@ -27,44 +27,18 @@ class TestRaw(unittest.TestCase):
         assert (y == x1 + x2).all()
 
     def test_kernel_attributes(self):
-        attributes = self.kern.attributes
-
-        for key in ['binaryVersion',
-                    'cacheModeCA',
-                    'constSizeBytes',
-                    'localSizeBytes',
-                    'maxDynamicSharedSizeBytes',
-                    'maxThreadsPerBlock',
-                    'numRegs',
-                    'preferredShmemCarveout',
-                    'ptxVersion',
-                    'sharedSizeBytes']:
-            assert key in attributes
-
-        assert attributes['numRegs'] > 0
-        assert attributes['maxThreadsPerBlock'] > 0
-        assert attributes['sharedSizeBytes'] == 0
-
-    def test_set_max_dynamic_shared_size_bytes(self):
-        current_dynamic_mem = self.kern.attributes['maxDynamicSharedSizeBytes']
-        # don't try to set on hardware when the attribute is undefined (-1)
-        if current_dynamic_mem >= 0:
-            new_dynamic_mem = current_dynamic_mem // 2
-            self.kern.set_max_dynamic_shared_size_bytes(new_dynamic_mem)
-            updated_val = self.kern.attributes['maxDynamicSharedSizeBytes']
-            assert updated_val == new_dynamic_mem
-
-    def test_set_preferred_shmem_carveout(self):
-        current_percentage = self.kern.attributes['preferredShmemCarveout']
-        # don't try to set on hardware when the attribute is undefined (-1)
-        if current_percentage >= 0:
-            new_percentage = 50
-            self.kern.set_preferred_shmem_carveout(new_percentage)
-            updated_val = self.kern.attributes['preferredShmemCarveout']
-            assert updated_val == new_percentage
-
-        # ValueError for percentages outside of the range [0, 100]
-        with pytest.raises(ValueError):
-            self.kern.set_preferred_shmem_carveout(-1)
-        with pytest.raises(ValueError):
-            self.kern.set_preferred_shmem_carveout(101)
+        attrs = self.kern.attributes
+        for attribute in ['binary_version',
+                          'cache_mode_ca',
+                          'const_size_bytes',
+                          'local_size_bytes',
+                          'max_dynamic_shared_size_bytes',
+                          'max_threads_per_block',
+                          'num_regs',
+                          'preferred_shared_memory_carveout',
+                          'ptx_version',
+                          'shared_size_bytes']:
+            assert attribute in attrs
+        assert self.kern.num_regs > 0
+        assert self.kern.max_threads_per_block > 0
+        assert self.kern.shared_size_bytes == 0
