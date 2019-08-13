@@ -20,8 +20,8 @@ from cupy.cuda import device
 from cupy.cuda import memory as memory_module
 
 
-from cupy import util
 from cupy.cuda.runtime import CUDARuntimeError
+from cupy import util
 
 cimport cpython  # NOQA
 cimport cython  # NOQA
@@ -735,6 +735,17 @@ cdef class ndarray:
         """
         return _statistics._ndarray_argmax(self, axis, out, dtype, keepdims)
 
+    cpdef ndarray _nanargmax(self, axis=None, out=None, dtype=None,
+                             keepdims=False):
+        """Returns the indices of the maximum with nan along a given axis.
+
+        .. seealso::
+           :func:`cupy.nanargmax` for full documentation,
+           :meth:`numpy.ndarray.nanargmax`
+
+        """
+        return _statistics._ndarray_nanargmax(self, axis, out, dtype, keepdims)
+
     cpdef ndarray min(self, axis=None, out=None, dtype=None, keepdims=False):
         """Returns the minimum along a given axis.
 
@@ -756,6 +767,16 @@ cdef class ndarray:
         """
         return _statistics._ndarray_argmin(self, axis, out, dtype, keepdims)
 
+    cpdef ndarray _nanargmin(self, axis=None, out=None, dtype=None,
+                             keepdims=False):
+        """Returns the indices of the minimum with nan along a given axis.
+
+        .. seealso::
+           :func:`cupy.nanargmin` for full documentation,
+           :meth:`numpy.ndarray.nanargmin`
+
+        """
+        return _statistics._ndarray_nanargmin(self, axis, out, dtype, keepdims)
     # TODO(okuta): Implement ptp
 
     cpdef ndarray clip(self, a_min=None, a_max=None, out=None):
@@ -2539,7 +2560,7 @@ cpdef ndarray tensordot_core(
                    (ret_dtype == 'e' or ret_dtype == 'f'))
     use_tensor_core = (use_sgemmEx and
                        _cuda_runtime_version >= 9000 and
-                       int(device.get_compute_capability()) == 70)
+                       int(device.get_compute_capability()) >= 70)
 
     if use_sgemmEx or ret_dtype in 'fdFD':
         dtype = ret_dtype

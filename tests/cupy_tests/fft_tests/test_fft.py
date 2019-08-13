@@ -87,6 +87,7 @@ class TestFft(CachedTestCase):
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
                                  contiguous_check=False)
+    @testing.with_requires('numpy!=1.17.0')  # 1.17.0 raises ZeroDivisonError
     def test_ifft(self, xp, dtype):
         a = testing.shaped_random(self.shape, xp, dtype)
         out = xp.fft.ifft(a, n=self.n, norm=self.norm)
@@ -124,6 +125,7 @@ class TestFftOrder(unittest.TestCase):
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
                                  contiguous_check=False)
+    @testing.with_requires('numpy!=1.17.0')  # 1.17.0 raises ZeroDivisonError
     def test_ifft(self, xp, dtype):
         a = testing.shaped_random(self.shape, xp, dtype)
         if self.data_order == 'F':
