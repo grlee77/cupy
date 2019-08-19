@@ -23,3 +23,5 @@ cpdef enum:
     CUFFT_WORKAREA_MINIMAL = 0
     CUFFT_WORKAREA_USER = 1
     CUFFT_WORKAREA_PERFORMANCE = 2
+
+cpdef get_current_plan()

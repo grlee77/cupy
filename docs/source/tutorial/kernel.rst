@@ -186,9 +186,9 @@ In other words, you have control over grid size, block size, shared memory size 
    ...     y[tid] = x1[tid] + x2[tid];
    ... }
    ... ''', 'my_add')
-   >>> x1 = cupy.arange(25, dtype=cupy.float32).reshape(5, 5)
-   >>> x2 = cupy.arange(25, dtype=cupy.float32).reshape(5, 5)
-   >>> y = cupy.zeros((5, 5), dtype=cupy.float32)
+   >>> x1 = cp.arange(25, dtype=cp.float32).reshape(5, 5)
+   >>> x2 = cp.arange(25, dtype=cp.float32).reshape(5, 5)
+   >>> y = cp.zeros((5, 5), dtype=cp.float32)
    >>> add_kernel((5,), (5,), (x1, x2, y))  # grid, block and arguments
    >>> y
    array([[ 0.,  2.,  4.,  6.,  8.],
@@ -233,6 +233,50 @@ attributes:
     You can use ``cupy.cuda.Stream.null.synchronize()`` if you are using the default stream.
 
 
+Raw Modules
+-----------
+
+For dealing a large raw CUDA source or loading an existing CUDA binary, the :class:`~cupy.RawModule` class can be more handy. It can be initialized either by a CUDA source code, or by a path to the CUDA binary. The needed kernels can then be retrieved by calling the :meth:`~cupy.RawModule.get_function` method, which returns a `~cupy.RawKernel` instance that can be invoked as discussed above.
+
+.. doctest::
+
+    >>> loaded_from_source = r'''
+    ... extern "C"{
+    ...
+    ... __global__ void test_sum(const float* x1, const float* x2, float* y, \
+    ...                          unsigned int N)
+    ... {
+    ...     unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    ...     if (tid < N)
+    ...     {
+    ...         y[tid] = x1[tid] + x2[tid];
+    ...     }
+    ... }
+    ...
+    ... __global__ void test_multiply(const float* x1, const float* x2, float* y, \
+    ...                               unsigned int N)
+    ... {
+    ...     unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    ...     if (tid < N)
+    ...     {
+    ...         y[tid] = x1[tid] * x2[tid];
+    ...     }
+    ... }
+    ...
+    ... }'''
+    >>> module = cp.RawModule(loaded_from_source)
+    >>> ker_sum = module.get_function('test_sum')
+    >>> ker_times = module.get_function('test_multiply')
+    >>> N = 10
+    >>> x1 = cp.arange(N**2, dtype=cp.float32).reshape(N, N)
+    >>> x2 = cp.ones((N, N), dtype=cp.float32)
+    >>> y = cp.zeros((N, N), dtype=cp.float32)
+    >>> ker_sum((N,), (N,), (x1, x2, y, N**2))   # y = x1 + x2
+    >>> assert cp.allclose(y, x1 + x2)
+    >>> ker_times((N,), (N,), (x1, x2, y, N**2)) # y = x1 * x2
+    >>> assert cp.allclose(y, x1 * x2)
+
+
 Kernel fusion
 --------------------
 
@@ -267,7 +311,7 @@ At the first function call, the fused function analyzes the original function ba
 
    >>> @cp.fuse()
    ... def sum_of_products(x, y):
-   ...     return cupy.sum(x * y, axis = -1)
+   ...     return cp.sum(x * y, axis = -1)
 
 You can specify the kernel name by using the ``kernel_name`` keyword argument as follows:
 
