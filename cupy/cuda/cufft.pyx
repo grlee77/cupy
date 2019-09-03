@@ -10,8 +10,6 @@ from cupy.cuda.runtime cimport DataType
 
 
 cdef object _thread_local = threading.local()
-if not hasattr(_thread_local, '_current_plan'):
-    _thread_local._current_plan = None
 
 
 cpdef get_current_plan():
@@ -20,6 +18,8 @@ cpdef get_current_plan():
     Returns:
         None or cupy.cuda.cufft.Plan1d or cupy.cuda.cufft.PlanNd
     """
+    if not hasattr(_thread_local, '_current_plan'):
+        _thread_local._current_plan = None
     return _thread_local._current_plan
 
 

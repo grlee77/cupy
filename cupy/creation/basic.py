@@ -236,7 +236,10 @@ def zeros_like(a, dtype=None, order='K', subok=None, shape=None):
     order, strides, memptr = _new_like_order_and_strides(a, dtype, order,
                                                          shape)
     shape = shape if shape else a.shape
+<<<<<<< HEAD
     a = cupy.ndarray(shape, dtype, memptr, strides, order)
+=======
+>>>>>>> 5929027613dbc971afce97bcec59ea66669e428c
     try:
         a.data.memset_async(0, a.nbytes)
     except cupy.cuda.runtime.CUDARuntimeError:
