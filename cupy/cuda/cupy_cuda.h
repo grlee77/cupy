@@ -69,8 +69,6 @@ struct CUfunc_st;
 struct CUmod_st;
 struct CUstream_st;
 struct CUlinkState_st;
-// struct CUarray_st; // GRL: needed?
-struct cudaArray;  // GRL: needed?
 
 
 typedef struct CUctx_st* CUcontext;
@@ -79,7 +77,6 @@ typedef struct CUfunc_st* CUfunction;
 typedef struct CUmod_st* CUmodule;
 typedef struct CUstream_st* cudaStream_t;
 typedef struct CUlinkState_st* CUlinkState;
-typedef struct cudaArray* cudaArray_t;
 typedef struct CUtexref_st* CUtexref;
 typedef struct CUarray_st* CUarray;
 typedef struct CUDA_ARRAY_DESCRIPTOR {
@@ -268,17 +265,6 @@ struct cudaPos {
   size_t y;
   size_t z;
 };
-
-// struct cudaMemcpy3DParms {
-//   cudaArray_t           srcArray;
-//   struct cudaPos        srcPos;
-//   struct cudaPitchedPtr srcPtr;
-//   cudaArray_t           dstArray;
-//   struct cudaPos        dstPos;
-//   struct cudaPitchedPtr dstPtr;
-//   struct cudaExtent     extent;
-//   enum cudaMemcpyKind   kind;
-// };
 
 typedef cudaPointerAttributes _PointerAttributes;
 

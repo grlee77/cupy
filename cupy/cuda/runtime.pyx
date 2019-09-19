@@ -26,31 +26,6 @@ cdef class PointerAttributes:
         self.memoryType = memoryType
 
 
-cdef class PitchedPtr:
-
-    def __init__(self, size_t pitch, intptr_t ptr, size_t xsize, size_t ysize):
-        self.pitch = pitch
-        self.ptr = ptr
-        self.xsize = xsize
-        self.ysize = ysize
-
-
-cdef class Pos:
-
-    def __init__(self, size_t x, size_t y, size_t z):
-        self.x = x
-        self.y = y
-        self.z = z
-
-
-cdef class Extent:
-
-    def __init__(self, size_t depth, size_t height, size_t width):
-        self.depth = depth
-        self.height = height
-        self.width = width
-
-
 class FormatDesc:
 
     def __init__(self, int f, int w, int x, int y, int z):
@@ -82,8 +57,6 @@ class FormatDesc:
 cdef extern from *:
     ctypedef int DeviceAttr 'enum cudaDeviceAttr'
     ctypedef int MemoryAdvise 'enum cudaMemoryAdvise'
-    ctypedef int MemoryKind 'enum cudaMemcpyKind'
-    ctypedef int ChannelFormatKind 'enum cudaChannelFormatKind'
 
     ctypedef void StreamCallbackDef(
         driver.Stream stream, Error status, void* userData)
@@ -99,39 +72,6 @@ cdef extern from 'cupy_cuda.h' nogil:
         void* hostPointer
         int isManaged
         int memoryType
-
-    struct _PitchedPtr 'cudaPitchedPtr':
-        size_t pitch
-        void* ptr
-        size_t xsize
-        size_t ysize
-
-    struct _Pos 'cudaPos':
-        size_t x
-        size_t y
-        size_t z
-
-    struct _Extent 'cudaExtent':
-        size_t depth
-        size_t height
-        size_t width
-
-    struct _Memcpy3DParms 'cudaMemcpy3DParms':
-        driver.Array dstArray
-        _Pos dstPos
-        _PitchedPtr dstPtr
-        _Extent extent
-        MemoryKind kind
-        driver.Array srcArray
-        _Pos srcPos
-        _PitchedPtr srcPtr
-
-    struct _ChannelFormatDesc 'cudaChannelFormatDesc':
-        ChannelFormatKind f
-        int w
-        int x
-        int y
-        int z
 
     # Error handling
     const char* cudaGetErrorName(Error error)
@@ -168,10 +108,6 @@ cdef extern from 'cupy_cuda.h' nogil:
     int cudaFreeArray(Array array)
     int cudaMemGetInfo(size_t* free, size_t* total)
     int cudaMallocPitch(void** devPtr, size_t *pitch, size_t width, size_t height) nogil
-    int cudaMallocArray(driver.Array* array, _ChannelFormatDesc* desc,
-                        size_t width, size_t height, unsigned int flags) nogil
-    int cudaMalloc3DArray(driver.Array* array, _ChannelFormatDesc* desc,
-                          _Extent extent, unsigned int flags) nogil
     # TODO: RUNTIME API: cudaArrayGetInfo ( cudaChannelFormatDesc* desc, cudaExtent* extent, unsigned int* flags, cudaArray_t array )
     # https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__MEMORY.html#group__CUDART__MEMORY_1g373dacf191566b0bf5e5b807517b6bf9
     # TODO: RUNTIME API:  cudaFreeArray ( cudaArray_t array )
@@ -562,14 +498,6 @@ cpdef memcpy3DAsync(intptr_t Memcpy3DParmsPtr, intptr_t stream):
     with nogil:
         status = cudaMemcpy3DAsync(<Memcpy3DParms*>Memcpy3DParmsPtr,
                                    <driver.Stream> stream)
-    check_status(status)
-
-
-cpdef memcpy2D(intptr_t dst, size_t dpitch, intptr_t src, size_t spitch,
-               size_t width, size_t height, int kind):
-    with nogil:
-        status = cudaMemcpy2D(<void*>dst, dpitch, <void*> src, spitch, width,
-                              height, <MemoryKind> kind)
     check_status(status)
 
 
