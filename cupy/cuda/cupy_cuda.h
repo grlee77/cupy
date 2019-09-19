@@ -57,6 +57,9 @@ typedef enum {
 enum CUjit_option {};
 enum CUjitInputType {};
 enum CUfunction_attribute {};
+enum CUarray_format {};
+enum CUaddress_mode {};
+enum CUfilter_mode {};
 
 
 typedef void* CUdeviceptr;
@@ -77,6 +80,14 @@ typedef struct CUmod_st* CUmodule;
 typedef struct CUstream_st* cudaStream_t;
 typedef struct CUlinkState_st* CUlinkState;
 typedef struct cudaArray* cudaArray_t;
+typedef struct CUtexref_st* CUtexref;
+typedef struct CUarray_st* CUarray;
+typedef struct CUDA_ARRAY_DESCRIPTOR {
+    CUarray_format Format;
+    size_t Height;
+    unsigned int NumChannels;
+    size_t Width;
+};
 
 // Error handling
 CUresult cuGetErrorName(...) {
@@ -147,6 +158,10 @@ CUresult cuModuleGetGlobal(...) {
     return CUDA_SUCCESS;
 }
 
+CUresult cuModuleGetTexRef(...) {
+    return CUDA_SUCCESS;
+}
+
 CUresult cuLaunchKernel(...) {
     return CUDA_SUCCESS;
 }
@@ -157,6 +172,47 @@ CUresult cuFuncGetAttribute(...) {
 }
 
 CUresult cuFuncSetAttribute(...) {
+    return CUDA_SUCCESS;
+}
+
+// Texture reference
+CUresult cuTexRefSetAddress (...) {
+    return CUDA_SUCCESS;
+}
+
+CUresult cuTexRefSetAddress2D (...) {
+    return CUDA_SUCCESS;
+}
+
+CUresult cuTexRefSetAddressMode (...) {
+    return CUDA_SUCCESS;
+}
+
+CUresult cuTexRefSetArray (...) {
+    return CUDA_SUCCESS;
+}
+
+CUresult cuTexRefSetBorderColor (...) {
+    return CUDA_SUCCESS;
+}
+
+CUresult cuTexRefSetFilterMode (...) {
+    return CUDA_SUCCESS;
+}
+
+CUresult cuTexRefSetFlags (...) {
+    return CUDA_SUCCESS;
+}
+
+CUresult cuTexRefSetFormat (...) {
+    return CUDA_SUCCESS;
+}
+
+CUresult cuTexRefSetMaxAnisotropy (...) {
+    return CUDA_SUCCESS;
+}
+
+CUresult cuParamSetTexRef (...) {
     return CUDA_SUCCESS;
 }
 
@@ -227,6 +283,79 @@ struct cudaPos {
 typedef cudaPointerAttributes _PointerAttributes;
 
 
+enum cudaChannelFormatKind {};
+typedef unsigned long long cudaTextureObject_t;
+enum cudaResourceType {};
+enum cudaTextureAddressMode {};
+enum cudaTextureFilterMode {};
+enum cudaTextureReadMode {};
+struct cudaResourceViewDesc;
+typedef void* cudaArray_t;
+struct cudaExtent {
+    size_t width, height, depth;
+};
+struct cudaPos {
+    size_t x, y, z;
+};
+struct cudaPitchedPtr {
+    size_t pitch;
+    void* ptr;
+    size_t xsize, ysize;
+};
+typedef void* cudaMipmappedArray_t;
+struct cudaMemcpy3DParms {
+    cudaArray_t srcArray;
+    struct cudaPos srcPos;
+    struct cudaPitchedPtr srcPtr;
+    cudaArray_t dstArray;
+    struct cudaPos dstPos;
+    struct cudaPitchedPtr dstPtr;
+    struct cudaExtent extent;
+    enum cudaMemcpyKind kind;
+};
+struct cudaChannelFormatDesc {
+    int x, y, z, w;
+    enum cudaChannelFormatKind f;
+};
+struct cudaResourceDesc {
+    enum cudaResourceType resType;
+
+    union {
+        struct {
+            cudaArray_t array;
+        } array;
+        struct {
+            cudaMipmappedArray_t mipmap;
+        } mipmap;
+        struct {
+            void *devPtr;
+            struct cudaChannelFormatDesc desc;
+            size_t sizeInBytes;
+        } linear;
+        struct {
+            void *devPtr;
+            struct cudaChannelFormatDesc desc;
+            size_t width;
+            size_t height;
+            size_t pitchInBytes;
+        } pitch2D;
+    } res;
+};
+struct cudaTextureDesc {
+    enum cudaTextureAddressMode addressMode[3];
+    enum cudaTextureFilterMode filterMode;
+    enum cudaTextureReadMode readMode;
+    int sRGB;
+    float borderColor[4];
+    int normalizedCoords;
+    unsigned int maxAnisotropy;
+    enum cudaTextureFilterMode mipmapFilterMode;
+    float mipmapLevelBias;
+    float minMipmapLevelClamp;
+    float maxMipmapLevelClamp;
+};
+
+
 // Error handling
 const char* cudaGetErrorName(...) {
     return NULL;
@@ -286,6 +415,14 @@ cudaError_t cudaMalloc(...) {
     return cudaSuccess;
 }
 
+cudaError_t cudaMalloc3DArray(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaMallocArray(...) {
+    return cudaSuccess;
+}
+
 cudaError_t cudaHostAlloc(...) {
     return cudaSuccess;
 }
@@ -318,6 +455,10 @@ int cudaFree(...) {
     return cudaSuccess;
 }
 
+cudaError_t cudaFreeArray(...) {
+    return cudaSuccess;
+}
+
 cudaError_t cudaFreeHost(...) {
     return cudaSuccess;
 }
@@ -343,6 +484,34 @@ cudaError_t cudaMemcpyPeerAsync(...) {
 }
 
 cudaError_t cudaMemcpy2D(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaMemcpy2DAsync(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaMemcpy2DFromArray(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaMemcpy2DFromArrayAsync(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaMemcpy2DToArray(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaMemcpy2DToArrayAsync(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaMemcpy3D(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaMemcpy3DAsync(...) {
     return cudaSuccess;
 }
 
@@ -423,6 +592,43 @@ cudaError_t cudaEventRecord(...) {
 
 cudaError_t cudaEventSynchronize(...) {
     return cudaSuccess;
+}
+
+
+// Texture
+cudaError_t cudaCreateTextureObject(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaDestroyTextureObject(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaGetChannelDesc(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaGetTextureObjectResourceDesc(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaGetTextureObjectTextureDesc(...) {
+    return cudaSuccess;
+}
+
+cudaExtent make_cudaExtent(...) {
+    struct cudaExtent ex = {0};
+    return ex;
+}
+
+cudaPitchedPtr make_cudaPitchedPtr(...) {
+    struct cudaPitchedPtr ptr = {0};
+    return ptr;
+}
+
+cudaPos make_cudaPos(...) {
+    struct cudaPos pos = {0};
+    return pos;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

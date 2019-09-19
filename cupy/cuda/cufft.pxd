@@ -2,7 +2,7 @@ cdef extern from *:
     ctypedef float Float 'cufftReal'
     ctypedef double Double 'cufftDoubleReal'
     ctypedef int Result 'cufftResult_t'
-    ctypedef size_t Handle 'cufftHandle'
+    ctypedef int Handle 'cufftHandle'
     ctypedef int Type 'cufftType_t'
 # should have some check similar to:
 #if defined(__CUDACC_VER_MAJOR__) && ((__CUDACC_VER_MAJOR__ == 9 && __CUDACC_VER_MINOR__ >= 2) || (__CUDACC_VER_MAJOR__ > 9))
