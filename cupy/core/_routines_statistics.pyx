@@ -234,49 +234,43 @@ cdef _nanargmax = create_reduction_func(
 cdef ndarray _var(
         ndarray a, axis=None, dtype=None, out=None, ddof=0, keepdims=False):
 
-    if a.dtype.kind == 'c':
-        if out is not None:
-            raise NotImplementedError(
-                'Variance for complex numbers is not implemented when out != '
-                'None. Current implemention does not convert the dtype.'
-            )
-        dtype_out = dtype
-        if dtype in ['D', 'F']:
-            dtype == dtype.lower()
-        out = _var(a.real, axis, dtype, None, ddof, keepdims)
-        out += _var(a.imag, axis, dtype, None, ddof, keepdims)
-        if dtype_out is not None and dtype_out != dtype:
-            out = out.astype(dtype_out, copy=False)
-        return out
-
     if axis is None:
         axis = tuple(range(a.ndim))
     if not isinstance(axis, tuple):
         axis = (axis,)
 
+    dtype_mean = a.dtype.char
     dtype_out = dtype
-    if dtype in ['D', 'F']:
-        if a.dtype.kind == 'f':
-            dtype = a.dtype.char
+    if dtype is None:
+        if a.dtype.kind in 'biu':
+            dtype_mean = 'float64'
+            dtype_out = 'float64'
         else:
-            dtype = 'd'
-    elif dtype is None and a.dtype.kind in 'biu':
-        dtype = 'd'
+            dtype_mean = a.dtype.char
+            dtype_out = a.dtype.char
+            if a.dtype.kind == 'c':
+                dtype_out = dtype_out.lower()
 
     shape = a.shape
     items = 1
     for ax in axis:
         items *= shape[ax]
     alpha = 1. / max(items - ddof, 0)
-    arrmean = a.mean(axis=axis, dtype=dtype, out=None, keepdims=True)
+    arrmean = a.mean(axis=axis, dtype=dtype_mean, out=None, keepdims=True)
+
     if out is None:
         out = _var_core(a, arrmean, alpha, axis=axis, keepdims=keepdims)
     else:
         out = _var_core_out(
             a, arrmean, alpha, out, axis=axis, keepdims=keepdims)
-    if dtype_out is not None and dtype_out != dtype:
-        out = out.astype(dtype_out, copy=False)
-    return out
+
+    if dtype_out != dtype_mean:
+        if out.dtype.kind == 'c':
+            return out.real.astype(dtype_out)
+        else:
+            return out.astype(dtype_out, copy=False)
+    else:
+        return out
 
 
 cdef ndarray _std(
@@ -286,15 +280,26 @@ cdef ndarray _std(
     return _math._sqrt(ret, dtype=dtype, out=out)
 
 
+cdef _norm_preamble = '''
+template <typename T> __device__ T my_norm(T x) { return x * x; }
+
+__device__ float16 my_norm(const complex<float16>& x) { return norm(x); }
+__device__ float my_norm(const complex<float>& x) { return norm(x); }
+__device__ double my_norm(const complex<double>& x) { return norm(x); }
+'''
+
+
 cdef _var_core = ReductionKernel(
     'S x, T mean, T alpha', 'T out',
-    '(x - mean) * (x - mean)',
-    'a + b', 'out = alpha * a', '0', '_var_core')
+    'my_norm(static_cast<T>(x) - mean)',
+    'a + b', 'out = alpha * a', '0', '_var_core', preamble=_norm_preamble)
+
 
 cdef _var_core_out = ReductionKernel(
     'S x, T mean, T alpha', 'U out',
-    '(x - mean) * (x - mean)',
-    'a + b', 'out = alpha * a', '0', '_var_core')
+    'my_norm(static_cast<T>(x) - mean)',
+    'a + b', 'out = alpha * a', '0', '_var_core', preamble=_norm_preamble)
+
 
 # TODO(okuta) needs cast
 cdef _mean = create_reduction_func(
