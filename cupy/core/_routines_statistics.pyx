@@ -1,3 +1,5 @@
+import numpy
+
 from cupy.core._kernel import create_reduction_func
 from cupy.core._kernel import ReductionKernel
 
@@ -255,38 +257,37 @@ cdef ndarray _var(
     if not isinstance(axis, tuple):
         axis = (axis,)
 
-    dtype_mean = a.dtype.char
-    dtype_out = dtype
+    dtype_mean = a.dtype
+    dtype_out = numpy.dtype(dtype)
     if dtype is None:
         if a.dtype.kind in 'biu':
             dtype_mean = 'float64'
             dtype_out = 'float64'
         else:
-            dtype_mean = a.dtype.char
-            dtype_out = a.dtype.char
+            dtype_mean = a.dtype
+            dtype_out = a.dtype
             if a.dtype.kind == 'c':
-                dtype_out = dtype_out.lower()
+                dtype_out = numpy.dtype(a.dtype.char.lower())
 
     shape = a.shape
-    items = 1
+    cdef Py_ssize_t items = 1
     for ax in axis:
         items *= shape[ax]
-    alpha = 1. / max(items - ddof, 0)
+
+    alpha = 1 / max(items - ddof, 0)
     arrmean = a.mean(axis=axis, dtype=dtype_mean, out=None, keepdims=True)
 
     if out is None:
-        out = _var_core(a, arrmean, alpha, axis=axis, keepdims=keepdims)
-    else:
-        out = _var_core_out(
-            a, arrmean, alpha, out, axis=axis, keepdims=keepdims)
-
-    if dtype_out != dtype_mean:
-        if out.dtype.kind == 'c':
-            return out.real.astype(dtype_out)
+        if dtype_out == 'float16':
+            var_core = _var_core_float16
+        elif dtype_out == 'float32':
+            var_core = _var_core_float32
         else:
-            return out.astype(dtype_out, copy=False)
-    else:
-        return out
+            var_core = _var_core_float64
+        return var_core(a, arrmean, alpha, axis=axis, keepdims=keepdims)
+
+    out = _var_core_out(a, arrmean, alpha, out, axis=axis, keepdims=keepdims)
+    return out.astype(dtype_out, copy=False)
 
 
 cdef ndarray _std(
@@ -298,22 +299,32 @@ cdef ndarray _std(
 
 cdef _norm_preamble = '''
 template <typename T> __device__ T my_norm(T x) { return x * x; }
-
-__device__ float16 my_norm(const complex<float16>& x) { return norm(x); }
 __device__ float my_norm(const complex<float>& x) { return norm(x); }
 __device__ double my_norm(const complex<double>& x) { return norm(x); }
 '''
 
 
-cdef _var_core = ReductionKernel(
-    'S x, T mean, T alpha', 'T out',
-    'my_norm(static_cast<T>(x) - mean)',
+cdef _var_core_float16 = ReductionKernel(
+    'S x, T mean, float32 alpha', 'float16 out',
+    'my_norm(x - mean)',
+    'a + b', 'out = alpha * a', '0', '_var_core', preamble=_norm_preamble)
+
+
+cdef _var_core_float32 = ReductionKernel(
+    'S x, T mean, float32 alpha', 'float32 out',
+    'my_norm(x - mean)',
+    'a + b', 'out = alpha * a', '0', '_var_core', preamble=_norm_preamble)
+
+
+cdef _var_core_float64 = ReductionKernel(
+    'S x, T mean, float64 alpha', 'float64 out',
+    'my_norm(x - mean)',
     'a + b', 'out = alpha * a', '0', '_var_core', preamble=_norm_preamble)
 
 
 cdef _var_core_out = ReductionKernel(
-    'S x, T mean, T alpha', 'U out',
-    'my_norm(static_cast<T>(x) - mean)',
+    'S x, T mean, U alpha', 'U out',
+    'my_norm(x - mean)',
     'a + b', 'out = alpha * a', '0', '_var_core', preamble=_norm_preamble)
 
 
