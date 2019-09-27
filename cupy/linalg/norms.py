@@ -18,64 +18,20 @@ __device__ float my_norm(const complex<float>& x) { return norm(x); }
 __device__ double my_norm(const complex<double>& x) { return norm(x); }
 '''
 
-l2norm_float16_kernel = cupy.core.ReductionKernel(
-    'float16 x', 'float16 y', 'x * x', 'a + b', 'y = sqrt(a)', '0',
-    'l2norm_float16',
-)
+_l2_fast = cupy.core.create_reduction_func(
+    'l2_fast',
+    ('?->d', 'e->e', 'f->f', 'd->d',
+     ('F->f', ('my_norm(in0)', None, None, None)),
+     ('D->d', ('my_norm(in0)', None, None, None))),
+    ('in0 * in0', 'a + b',
+     'out0 = sqrt(a)', None),
+    preamble=_norm_preamble)
 
-l2norm_float32_kernel = cupy.core.ReductionKernel(
-    'T x', 'float32 y', 'my_norm(x)', 'a + b', 'y = sqrt(a)', '0',
-    'l2norm_float32', preamble=_norm_preamble,
-)
-
-l2norm_float64_kernel = cupy.core.ReductionKernel(
-    'T x', 'float64 y', 'my_norm(x)', 'a + b', 'y = sqrt(a)', '0',
-    'l2norm_float64', preamble=_norm_preamble,
-)
-
-
-def _l2norm_fast(x, axis, keepdims):
-    """Fast ord=2 norm case for real or complex floating point x."""
-
-    # Output dtype is determined by the dtype of the real component
-    real_dtype = x.dtype.char.lower()
-    if real_dtype == 'e':
-        kern = l2norm_float16_kernel
-    elif real_dtype == 'd':
-        kern = l2norm_float64_kernel
-    else:
-        kern = l2norm_float32_kernel
-    return kern(x, axis=axis, keepdims=keepdims)
-
-
-l1norm_float16_kernel = cupy.core.ReductionKernel(
-    'float16 x', 'float16 y', 'abs(x)', 'a + b', 'y = a', '0',
-    'l1norm_float16',
-)
-
-l1norm_float32_kernel = cupy.core.ReductionKernel(
-    'T x', 'float32 y', 'abs(x)', 'a + b', 'y = a', '0',
-    'l1norm_float32',
-)
-
-l1norm_float64_kernel = cupy.core.ReductionKernel(
-    'T x', 'float64 y', 'abs(x)', 'a + b', 'y = a', '0',
-    'l1norm_float64',
-)
-
-
-def _l1norm_fast(x, axis, keepdims):
-    """Fast ord=1 (l1-norm) case for real or complex floating point x."""
-
-    # Output dtype is determined by the dtype of the real component
-    real_dtype = x.dtype.char.lower()
-    if real_dtype == 'e':
-        kern = l1norm_float16_kernel
-    elif real_dtype == 'd':
-        kern = l1norm_float64_kernel
-    else:
-        kern = l1norm_float32_kernel
-    return kern(x, axis=axis, keepdims=keepdims)
+_l1_fast = cupy.core.create_reduction_func(
+    'l1_fast',
+    ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
+    ('abs(in0)', 'a + b',
+     'out0 = a', None))
 
 _nonzero_preamble = '''
 template <typename T> __device__ bool _nonzero(T x) { return x != 0; }
@@ -83,34 +39,23 @@ __device__ bool _nonzero(const complex<float>& x) { return x.real() != 0 || x.im
 __device__ bool _nonzero(const complex<double>& x) { return x.real() != 0 || x.imag() != 0; }
 '''
 
-l0norm_float16_kernel = cupy.core.ReductionKernel(
-    'float16 x', 'float16 y', '_nonzero(x)', 'a + b', 'y = a', '0',
-    'l1norm_float16', preamble=_nonzero_preamble,
-)
+_l0_fast = cupy.core.create_reduction_func(
+    'l0_fast',
+    ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
+    ('_nonzero(in0)', 'a + b',
+     'out0 = a', None), preamble=_nonzero_preamble)
 
-l0norm_float32_kernel = cupy.core.ReductionKernel(
-    'T x', 'float32 y', '_nonzero(x)', 'a + b', 'y = a', '0',
-    'l1norm_float32', preamble=_nonzero_preamble,
-)
+_absmax_fast = cupy.core.create_reduction_func(
+    'l0_fast',
+    ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
+    ('abs(in0)', 'max(a, b)',
+     'out0 = a', None))
 
-l0norm_float64_kernel = cupy.core.ReductionKernel(
-    'T x', 'float64 y', '_nonzero(x)', 'a + b', 'y = a', '0',
-    'l1norm_float64', preamble=_nonzero_preamble,
-)
-
-
-def _l0norm_fast(x, axis, keepdims):
-    """Fast ord=0 case for real or complex floating point x."""
-
-    # Output dtype is determined by the dtype of the real component
-    real_dtype = x.dtype.char.lower()
-    if real_dtype == 'e':
-        kern = l0norm_float16_kernel
-    elif real_dtype == 'd':
-        kern = l0norm_float64_kernel
-    else:
-        kern = l0norm_float32_kernel
-    return kern(x, axis=axis, keepdims=keepdims)
+_absmin_fast = cupy.core.create_reduction_func(
+    'l0_fast',
+    ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
+    ('abs(in0)', 'min(a, b)',
+     'out0 = a', None))
 
 
 def norm(x, ord=None, axis=None, keepdims=False):
@@ -139,7 +84,7 @@ def norm(x, ord=None, axis=None, keepdims=False):
         ndim = x.ndim
         if (ord is None or (ndim == 1 and ord == 2) or
                 (ndim == 2 and ord in ('f', 'fro'))):
-            ret = _l2norm_fast(x, axis, keepdims)
+            ret = _l2_fast(x, axis=axis, keepdims=keepdims)
             return ret
 
     # Normalize the `axis` argument to a tuple.
@@ -156,18 +101,16 @@ def norm(x, ord=None, axis=None, keepdims=False):
 
     if len(axis) == 1:
         if ord == numpy.Inf:
-            return abs(x).max(axis=axis, keepdims=keepdims)
+            return _absmax_fast(x, axis=axis, keepdims=keepdims)
         elif ord == -numpy.Inf:
-            return abs(x).min(axis=axis, keepdims=keepdims)
+            return _absmin_fast(axis=axis, keepdims=keepdims)
         elif ord == 0:
             # Zero norm
-            return _l0norm_fast(x, axis, keepdims)
+            return _l0_fast(x, axis=axis, keepdims=keepdims)
         elif ord == 1:
-            # special case for speedup
-            return _l1norm_fast(x, axis, keepdims)
+            return _l1_fast(x, axis=axis, keepdims=keepdims)
         elif ord is None or ord == 2:
-            # special case for speedup
-            return _l2norm_fast(x, axis, keepdims)
+            return _l2_fast(x, axis=axis, keepdims=keepdims)
         else:
             try:
                 float(ord)
@@ -193,19 +136,19 @@ def norm(x, ord=None, axis=None, keepdims=False):
         if ord == 1:
             if col_axis > row_axis:
                 col_axis -= 1
-            ret = _l1norm_fast(x, row_axis, False).max(axis=col_axis)
+            ret = _l1_fast(x, axis=row_axis, keepdims=False).max(axis=col_axis)
         elif ord == numpy.Inf:
             if row_axis > col_axis:
                 row_axis -= 1
-            ret = _l1norm_fast(x, col_axis, False).max(axis=row_axis)
+            ret = _l1_fast(x, axis=col_axis, keepdims=False).max(axis=row_axis)
         elif ord == -1:
             if col_axis > row_axis:
                 col_axis -= 1
-            ret = _l1norm_fast(x, row_axis, False).min(axis=col_axis)
+            ret = _l1_fast(x, axis=row_axis, keepdims=False).min(axis=col_axis)
         elif ord == -numpy.Inf:
             if row_axis > col_axis:
                 row_axis -= 1
-            ret = _l1norm_fast(x, col_axis, False).min(axis=row_axis)
+            ret = _l1_fast(x, axis=col_axis, keepdims=False).min(axis=row_axis)
         elif ord in [None, 'fro', 'f']:
             if x.dtype.kind == 'c':
                 s = abs(x)
