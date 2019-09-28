@@ -12,6 +12,52 @@ if cuda.cusolver_enabled:
     from cupy.cuda import cusolver
 
 
+_norm_preamble = '''
+template <typename T> __device__ T my_norm(T x) { return x * x; }
+__device__ float my_norm(const complex<float>& x) { return norm(x); }
+__device__ double my_norm(const complex<double>& x) { return norm(x); }
+'''
+
+_l2_fast = cupy.core.create_reduction_func(
+    'l2_fast',
+    ('?->d', 'e->e', 'f->f', 'd->d',
+     ('F->f', ('my_norm(in0)', None, None, None)),
+     ('D->d', ('my_norm(in0)', None, None, None))),
+    ('in0 * in0', 'a + b',
+     'out0 = sqrt(a)', None),
+    preamble=_norm_preamble)
+
+_l1_fast = cupy.core.create_reduction_func(
+    'l1_fast',
+    ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
+    ('abs(in0)', 'a + b',
+     'out0 = a', None))
+
+_nonzero_preamble = '''
+template <typename T> __device__ bool _nonzero(T x) { return x != 0; }
+__device__ bool _nonzero(const complex<float>& x) { return x.real() != 0 || x.imag() != 0; }
+__device__ bool _nonzero(const complex<double>& x) { return x.real() != 0 || x.imag() != 0; }
+'''
+
+_l0_fast = cupy.core.create_reduction_func(
+    'l0_fast',
+    ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
+    ('_nonzero(in0)', 'a + b',
+     'out0 = a', None), preamble=_nonzero_preamble)
+
+_absmax_fast = cupy.core.create_reduction_func(
+    'l0_fast',
+    ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
+    ('abs(in0)', 'max(a, b)',
+     'out0 = a', None))
+
+_absmin_fast = cupy.core.create_reduction_func(
+    'l0_fast',
+    ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
+    ('abs(in0)', 'min(a, b)',
+     'out0 = a', None))
+
+
 def norm(x, ord=None, axis=None, keepdims=False):
     """Returns one of matrix norms specified by ``ord`` parameter.
 
@@ -38,14 +84,7 @@ def norm(x, ord=None, axis=None, keepdims=False):
         ndim = x.ndim
         if (ord is None or (ndim == 1 and ord == 2) or
                 (ndim == 2 and ord in ('f', 'fro'))):
-            if x.dtype.kind == 'c':
-                s = abs(x.ravel())
-                s *= s
-                ret = cupy.sqrt(s.sum())
-            else:
-                ret = cupy.sqrt((x * x).sum())
-            if keepdims:
-                ret = ret.reshape((1,) * ndim)
+            ret = _l2_fast(x, axis=axis, keepdims=keepdims)
             return ret
 
     # Normalize the `axis` argument to a tuple.
@@ -62,25 +101,16 @@ def norm(x, ord=None, axis=None, keepdims=False):
 
     if len(axis) == 1:
         if ord == numpy.Inf:
-            return abs(x).max(axis=axis, keepdims=keepdims)
+            return _absmax_fast(x, axis=axis, keepdims=keepdims)
         elif ord == -numpy.Inf:
-            return abs(x).min(axis=axis, keepdims=keepdims)
+            return _absmin_fast(axis=axis, keepdims=keepdims)
         elif ord == 0:
             # Zero norm
-            # Convert to Python float in accordance with NumPy
-            return (x != 0).astype(x.real.dtype).sum(
-                axis=axis, keepdims=keepdims)
+            return _l0_fast(x, axis=axis, keepdims=keepdims)
         elif ord == 1:
-            # special case for speedup
-            return abs(x).sum(axis=axis, keepdims=keepdims)
+            return _l1_fast(x, axis=axis, keepdims=keepdims)
         elif ord is None or ord == 2:
-            # special case for speedup
-            if x.dtype.kind == 'c':
-                s = abs(x)
-                s *= s
-            else:
-                s = x * x
-            return cupy.sqrt(s.sum(axis=axis, keepdims=keepdims))
+            return _l2_fast(x, axis=axis, keepdims=keepdims)
         else:
             try:
                 float(ord)
@@ -106,19 +136,19 @@ def norm(x, ord=None, axis=None, keepdims=False):
         if ord == 1:
             if col_axis > row_axis:
                 col_axis -= 1
-            ret = abs(x).sum(axis=row_axis).max(axis=col_axis)
+            ret = _l1_fast(x, axis=row_axis, keepdims=False).max(axis=col_axis)
         elif ord == numpy.Inf:
             if row_axis > col_axis:
                 row_axis -= 1
-            ret = abs(x).sum(axis=col_axis).max(axis=row_axis)
+            ret = _l1_fast(x, axis=col_axis, keepdims=False).max(axis=row_axis)
         elif ord == -1:
             if col_axis > row_axis:
                 col_axis -= 1
-            ret = abs(x).sum(axis=row_axis).min(axis=col_axis)
+            ret = _l1_fast(x, axis=row_axis, keepdims=False).min(axis=col_axis)
         elif ord == -numpy.Inf:
             if row_axis > col_axis:
                 row_axis -= 1
-            ret = abs(x).sum(axis=col_axis).min(axis=row_axis)
+            ret = _l1_fast(x, axis=col_axis, keepdims=False).min(axis=row_axis)
         elif ord in [None, 'fro', 'f']:
             if x.dtype.kind == 'c':
                 s = abs(x)
