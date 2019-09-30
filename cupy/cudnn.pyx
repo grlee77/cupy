@@ -2341,3 +2341,71 @@ cpdef get_fused_ops_variant_param_pack_attribute(size_t var_pack,
         cudnn.getFusedOpsVariantParamPackAttribute(var_pack, param_label,
                                                    <size_t>&ptr)
         return <size_t>ptr
+
+
+def reduce_tensor(
+        int op, core.ndarray A, tuple reduce_axis,
+        bint keepdims=False):
+    A = core._internal_ascontiguousarray(A)
+    dtype = A.dtype
+
+    A_ndim = A.ndim
+    if A_ndim > 8:
+        raise ValueError("cuDNN reductions does not support dimension > 8")
+
+    if A_ndim < 4:
+        A_shape = A.shape + (1, )*(4-A_ndim)
+    else:
+        A_shape = A.shape
+    A = A.reshape(A_shape)
+
+    out_shape = list(A_shape)
+    for i in reduce_axis:
+        out_shape[i] = 1
+    out_shape = tuple(out_shape)
+
+    if keepdims:
+        true_out_shape = out_shape[0:A_ndim]
+    else:
+        true_out_shape = [out_shape[i] for i in
+                          range(len(out_shape[0:A_ndim]))
+                          if i not in reduce_axis]
+
+    C = core.ndarray(out_shape, dtype)
+
+    cdef Descriptor A_desc = create_tensor_descriptor(A)
+    cdef Descriptor C_desc = create_tensor_descriptor(C)
+    cdef Descriptor r_desc = Descriptor(cudnn.createReduceTensorDescriptor(),
+                                        py_cudnn.destroyReduceTensorDescriptor)
+
+    cdef float float_one = 1, float_zero = 0
+    cdef double double_one = 1, double_zero = 0
+    if dtype == 'd':
+        zero = <size_t>&double_zero
+        one = <size_t>&double_one
+    elif dtype == 'f':
+        zero = <size_t>&float_zero
+        one = <size_t>&float_one
+    else:
+        raise ValueError('cupy.cudnn supports float32 and float64 only')
+
+    handle = get_handle()
+
+    cudnn.setReduceTensorDescriptor(r_desc.value, op,
+                                    get_data_type(dtype),
+                                    cudnn.CUDNN_PROPAGATE_NAN,
+                                    cudnn.CUDNN_REDUCE_TENSOR_NO_INDICES,
+                                    cudnn.CUDNN_32BIT_INDICES)
+
+    ws_size = cudnn.getReductionWorkspaceSize(handle,
+                                              r_desc.value,
+                                              A_desc.value,
+                                              C_desc.value)
+    cdef memory.MemoryPointer workspace = memory.alloc(ws_size)
+
+    cudnn.reduceTensor(handle, r_desc.value, <size_t>0, <size_t>0,
+                       workspace.ptr, workspace.mem.size, one,
+                       A_desc.value, A.data.ptr,
+                       zero, C_desc.value, C.data.ptr)
+    C = C.reshape(true_out_shape)
+    return C
