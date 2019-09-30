@@ -11,8 +11,45 @@ from cupy.linalg import util
 if cuda.cusolver_enabled:
     from cupy.cuda import cusolver
 
+have_cudnn = False
+try:
+    # from cupy import cudnn
+    from cupy.cudnn import reduce_tensor
 
-_norm_preamble = '''
+    def _reduce_cudnn(op, x, axis, keepdims):
+        if axis is None:
+            x = x.ravel()
+            axis = (0, )
+        elif numpy.isscalar(axis):
+            axis = (axis, )
+        return reduce_tensor(op, x, axis, keepdims)
+
+    def _l2_cudnn(x, axis, keepdims):
+        op = cupy.cuda.cudnn.CUDNN_REDUCE_TENSOR_NORM2
+        return _reduce_cudnn(op, x, axis, keepdims)
+
+    def _l1_cudnn(x, axis, keepdims):
+        op = cupy.cuda.cudnn.CUDNN_REDUCE_TENSOR_NORM1
+        return _reduce_cudnn(op, x, axis, keepdims)
+
+    def _amax_cudnn(x, axis, keepdims):
+        op = cupy.cuda.cudnn.CUDNN_REDUCE_TENSOR_AMAX
+        return _reduce_cudnn(op, x, axis, keepdims)
+
+    def _max_cudnn(x, axis, keepdims):
+        op = cupy.cuda.cudnn.CUDNN_REDUCE_TENSOR_MAX
+        return _reduce_cudnn(op, x, axis, keepdims)
+
+    def _min_cudnn(x, axis, keepdims):
+        op = cupy.cuda.cudnn.CUDNN_REDUCE_TENSOR_MIN
+        return _reduce_cudnn(op, x, axis, keepdims)
+
+    have_cudnn = True
+except ImportError:
+    pass
+
+
+_l2_preamble = '''
 template <typename T> __device__ T my_norm(T x) { return x * x; }
 __device__ float my_norm(const complex<float>& x) { return norm(x); }
 __device__ double my_norm(const complex<double>& x) { return norm(x); }
@@ -20,42 +57,32 @@ __device__ double my_norm(const complex<double>& x) { return norm(x); }
 
 _l2_fast = cupy.core.create_reduction_func(
     'l2_fast',
-    ('?->d', 'e->e', 'f->f', 'd->d',
-     ('F->f', ('my_norm(in0)', None, None, None)),
-     ('D->d', ('my_norm(in0)', None, None, None))),
-    ('in0 * in0', 'a + b',
+    ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
+    ('my_norm(in0)', 'a + b',
      'out0 = sqrt(a)', None),
-    preamble=_norm_preamble)
+    preamble=_l2_preamble)
 
 _l1_fast = cupy.core.create_reduction_func(
     'l1_fast',
     ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
-    ('abs(in0)', 'a + b',
-     'out0 = a', None))
-
-_nonzero_preamble = '''
-template <typename T> __device__ bool _nonzero(T x) { return x != 0; }
-__device__ bool _nonzero(const complex<float>& x) { return x.real() != 0 || x.imag() != 0; }
-__device__ bool _nonzero(const complex<double>& x) { return x.real() != 0 || x.imag() != 0; }
-'''
+    ('abs(in0)', 'a + b', 'out0 = a', None))
 
 _l0_fast = cupy.core.create_reduction_func(
     'l0_fast',
     ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
-    ('_nonzero(in0)', 'a + b',
-     'out0 = a', None), preamble=_nonzero_preamble)
+    ('in0 != type_in0_raw(0)', 'a + b', 'out0 = a', None))
 
 _absmax_fast = cupy.core.create_reduction_func(
     'l0_fast',
     ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
-    ('abs(in0)', 'max(a, b)',
-     'out0 = a', None))
+    ('abs(in0)', 'max(a, b)', 'out0 = a', None),
+    0)
 
 _absmin_fast = cupy.core.create_reduction_func(
     'l0_fast',
     ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
-    ('abs(in0)', 'min(a, b)',
-     'out0 = a', None))
+    ('abs(in0)', 'min(a, b)', 'out0 = a', None),
+    '1.0/0.0')  # identity=infinity
 
 
 def norm(x, ord=None, axis=None, keepdims=False):
@@ -79,12 +106,18 @@ def norm(x, ord=None, axis=None, keepdims=False):
     if not issubclass(x.dtype.type, numpy.inexact):
         x = x.astype(float)
 
+    cudnn_compatible_dtype = x.dtype.char == 'f' or x.dtype.char == 'g'
+
     # Immediately handle some default, simple, fast, and common cases.
     if axis is None:
         ndim = x.ndim
         if (ord is None or (ndim == 1 and ord == 2) or
                 (ndim == 2 and ord in ('f', 'fro'))):
-            ret = _l2_fast(x, axis=axis, keepdims=keepdims)
+            if have_cudnn and cudnn_compatible_dtype:
+                # ravel because cuDNN only supports ndim <= 8
+                ret = _l2_cudnn(x.ravel(), axis=axis, keepdims=keepdims)
+            else:
+                ret = _l2_fast(x, axis=axis, keepdims=keepdims)
             return ret
 
     # Normalize the `axis` argument to a tuple.
@@ -101,16 +134,25 @@ def norm(x, ord=None, axis=None, keepdims=False):
 
     if len(axis) == 1:
         if ord == numpy.Inf:
-            return _absmax_fast(x, axis=axis, keepdims=keepdims)
+            if have_cudnn and cudnn_compatible_dtype and x.ndim <= 8:
+                _amax_cudnn(x, axis=axis, keepdims=keepdims)
+            else:
+                return _absmax_fast(x, axis=axis, keepdims=keepdims)
         elif ord == -numpy.Inf:
-            return _absmin_fast(axis=axis, keepdims=keepdims)
+            return _absmin_fast(x, axis=axis, keepdims=keepdims)
         elif ord == 0:
             # Zero norm
             return _l0_fast(x, axis=axis, keepdims=keepdims)
         elif ord == 1:
-            return _l1_fast(x, axis=axis, keepdims=keepdims)
+            if have_cudnn and cudnn_compatible_dtype and x.ndim <= 8:
+                return _l1_cudnn(x, axis=axis, keepdims=keepdims)
+            else:
+                return _l1_fast(x, axis=axis, keepdims=keepdims)
         elif ord is None or ord == 2:
-            return _l2_fast(x, axis=axis, keepdims=keepdims)
+            if have_cudnn and cudnn_compatible_dtype and x.ndim <= 8:
+                return _l2_cudnn(x, axis=axis, keepdims=keepdims)
+            else:
+                return _l2_fast(x, axis=axis, keepdims=keepdims)
         else:
             try:
                 float(ord)
@@ -136,26 +178,49 @@ def norm(x, ord=None, axis=None, keepdims=False):
         if ord == 1:
             if col_axis > row_axis:
                 col_axis -= 1
-            ret = _l1_fast(x, axis=row_axis, keepdims=False).max(axis=col_axis)
+            if have_cudnn and cudnn_compatible_dtype:
+                ret = _l1_cudnn(x, axis=row_axis, keepdims=False)
+                ret = _max_cudnn(ret, axis=col_axis, keepdims=False)
+            else:
+                ret = _l1_fast(
+                    x, axis=row_axis, keepdims=False).max(axis=col_axis)
         elif ord == numpy.Inf:
             if row_axis > col_axis:
                 row_axis -= 1
-            ret = _l1_fast(x, axis=col_axis, keepdims=False).max(axis=row_axis)
+            if have_cudnn and cudnn_compatible_dtype:
+                ret = _l1_cudnn(x, axis=col_axis, keepdims=False)
+                ret = _max_cudnn(ret, axis=row_axis, keepdims=False)
+            else:
+                ret = _l1_fast(
+                    x, axis=col_axis, keepdims=False).max(axis=row_axis)
         elif ord == -1:
             if col_axis > row_axis:
                 col_axis -= 1
-            ret = _l1_fast(x, axis=row_axis, keepdims=False).min(axis=col_axis)
+            if have_cudnn and cudnn_compatible_dtype:
+                ret = _l1_cudnn(x, axis=row_axis, keepdims=False)
+                ret = _min_cudnn(ret, axis=col_axis, keepdims=False)
+            else:
+                ret = _l1_fast(
+                    x, axis=row_axis, keepdims=False).min(axis=col_axis)
         elif ord == -numpy.Inf:
             if row_axis > col_axis:
                 row_axis -= 1
-            ret = _l1_fast(x, axis=col_axis, keepdims=False).min(axis=row_axis)
-        elif ord in [None, 'fro', 'f']:
-            if x.dtype.kind == 'c':
-                s = abs(x)
-                s *= s
-                ret = cupy.sqrt(s.sum(axis=axis))
+            if have_cudnn and cudnn_compatible_dtype:
+                ret = _l1_cudnn(x, axis=col_axis, keepdims=False)
+                ret = _min_cudnn(ret, axis=row_axis, keepdims=False)
             else:
-                ret = cupy.sqrt((x * x).sum(axis=axis))
+                ret = _l1_fast(
+                    x, axis=col_axis, keepdims=False).min(axis=row_axis)
+        elif ord in [None, 'fro', 'f']:
+            if have_cudnn and cudnn_compatible_dtype and x.ndim <= 8:
+                ret = _l2_cudnn(x, axis=axis, keepdims=False)
+            else:
+                if x.dtype.kind == 'c':
+                    s = abs(x)
+                    s *= s
+                    ret = cupy.sqrt(s.sum(axis=axis))
+                else:
+                    ret = cupy.sqrt((x * x).sum(axis=axis))
         else:
             raise ValueError('Invalid norm order for matrices.')
         if keepdims:
