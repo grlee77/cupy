@@ -5,11 +5,13 @@
 
 #include <stdint.h>
 
-#ifndef CUPY_NO_CUDA
-#include <cuda.h>
-#endif
+#if CUPY_USE_HIP
 
-#ifndef CUPY_NO_CUDA
+#include "cupy_hip.h"
+
+#elif !defined(CUPY_NO_CUDA)
+
+#include <cuda.h>
 #include <cublas_v2.h>
 #include <cuda_profiler_api.h>
 #include <cuda_runtime.h>
@@ -19,6 +21,8 @@
 #endif // #ifndef CUPY_NO_NVTX
 
 extern "C" {
+
+bool hip_environment = false;
 
 #if CUDA_VERSION < 9000
 
@@ -42,49 +46,16 @@ cublasStatus_t cublasGetMathMode(...) {
 
 #else // #ifndef CUPY_NO_CUDA
 
-#define CUDA_VERSION 0
+#include "cupy_cuda_common.h"
+#include "cupy_cuComplex.h"
 
 extern "C" {
+
+bool hip_environment = false;
 
 ///////////////////////////////////////////////////////////////////////////////
 // cuda.h
 ///////////////////////////////////////////////////////////////////////////////
-
-typedef int CUdevice;
-typedef enum {
-    CUDA_SUCCESS = 0,
-} CUresult;
-enum CUjit_option {};
-enum CUjitInputType {};
-enum CUfunction_attribute {};
-enum CUarray_format {};
-enum CUaddress_mode {};
-enum CUfilter_mode {};
-
-
-typedef void* CUdeviceptr;
-struct CUctx_st;
-struct CUevent_st;
-struct CUfunc_st;
-struct CUmod_st;
-struct CUstream_st;
-struct CUlinkState_st;
-
-
-typedef struct CUctx_st* CUcontext;
-typedef struct CUevent_st* cudaEvent_t;
-typedef struct CUfunc_st* CUfunction;
-typedef struct CUmod_st* CUmodule;
-typedef struct CUstream_st* cudaStream_t;
-typedef struct CUlinkState_st* CUlinkState;
-typedef struct CUtexref_st* CUtexref;
-typedef struct CUarray_st* CUarray;
-typedef struct CUDA_ARRAY_DESCRIPTOR {
-    CUarray_format Format;
-    size_t Height;
-    unsigned int NumChannels;
-    size_t Width;
-};
 
 // Error handling
 CUresult cuGetErrorName(...) {
@@ -626,20 +597,6 @@ cudaPos make_cudaPos(...) {
 ///////////////////////////////////////////////////////////////////////////////
 // cublas_v2.h
 ///////////////////////////////////////////////////////////////////////////////
-
-typedef void* cublasHandle_t;
-
-typedef enum {} cublasDiagType_t;
-typedef enum {} cublasFillMode_t;
-typedef enum {} cublasOperation_t;
-typedef enum {} cublasPointerMode_t;
-typedef enum {} cublasSideMode_t;
-typedef enum {} cublasGemmAlgo_t;
-typedef enum {} cublasMath_t;
-typedef enum {
-    CUBLAS_STATUS_SUCCESS=0,
-} cublasStatus_t;
-
 
 // Context
 cublasStatus_t cublasCreate(...) {

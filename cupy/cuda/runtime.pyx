@@ -55,8 +55,8 @@ class FormatDesc:
 # Extern
 ###############################################################################
 cdef extern from *:
-    ctypedef int DeviceAttr 'enum cudaDeviceAttr'
-    ctypedef int MemoryAdvise 'enum cudaMemoryAdvise'
+    ctypedef int DeviceAttr 'cudaDeviceAttr'
+    ctypedef int MemoryAdvise 'cudaMemoryAdvise'
 
     ctypedef void StreamCallbackDef(
         driver.Stream stream, Error status, void* userData)
@@ -66,7 +66,7 @@ cdef extern from *:
 cdef extern from 'cupy_cuda.h' nogil:
 
     # Types
-    struct _PointerAttributes 'cudaPointerAttributes':
+    ctypedef struct _PointerAttributes 'cudaPointerAttributes':
         int device
         void* devicePointer
         void* hostPointer
@@ -204,6 +204,15 @@ cdef extern from 'cupy_cuda.h' nogil:
     int cudaGetChannelDesc(ChannelFormatDesc* desc, Array array)
     int cudaGetTextureObjectResourceDesc(ResourceDesc* desc, TextureObject obj)
     int cudaGetTextureObjectTextureDesc(TextureDesc* desc, TextureObject obj)
+
+    bint hip_environment
+    int cudaDevAttrComputeCapabilityMajor
+    int cudaDevAttrComputeCapabilityMinor
+
+_is_hip_environment = hip_environment
+is_hip = hip_environment
+deviceAttributeComputeCapabilityMajor = cudaDevAttrComputeCapabilityMajor
+deviceAttributeComputeCapabilityMinor = cudaDevAttrComputeCapabilityMinor
 
 
 ###############################################################################
