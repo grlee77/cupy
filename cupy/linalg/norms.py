@@ -65,17 +65,16 @@ def norm(x, ord=None, axis=None, keepdims=False):
             # fast CUB-based reductions require axis=None, keepdims=False
             axis = None
         if ord == numpy.Inf:
-            ret = abs(x).max(axis=axis, keepdims=False)
+            ret = abs(x).max(axis=axis)
         elif ord == -numpy.Inf:
-            ret = abs(x).min(axis=axis, keepdims=False)
+            ret = abs(x).min(axis=axis)
         elif ord == 0:
             # Zero norm
             # Convert to Python float in accordance with NumPy
-            ret = (x != 0).astype(x.real.dtype).sum(
-                axis=axis, keepdims=False)
+            ret = (x != 0).astype(x.real.dtype).sum(axis=axis)
         elif ord == 1:
             # special case for speedup
-            ret = abs(x).sum(axis=axis, keepdims=False)
+            ret = abs(x).sum(axis=axis)
         elif ord is None or ord == 2:
             # special case for speedup
             if x.dtype.kind == 'c':
@@ -83,7 +82,7 @@ def norm(x, ord=None, axis=None, keepdims=False):
                 s *= s
             else:
                 s = x * x
-            ret = cupy.sqrt(s.sum(axis=axis, keepdims=False))
+            ret = cupy.sqrt(s.sum(axis=axis))
         else:
             try:
                 float(ord)
@@ -92,9 +91,11 @@ def norm(x, ord=None, axis=None, keepdims=False):
 
             absx = abs(x)
             absx **= ord
-            ret = absx.sum(axis=axis, keepdims=False)
+            ret = absx.sum(axis=axis)
             ret **= cupy.reciprocal(ord, dtype=ret.dtype)
         if keepdims:
+            if nd == 1:
+                return ret.reshape((1,))
             ret_shape = list(x.shape)
             ret_shape[axis[0]] = 1
             ret = ret.reshape(ret_shape)
