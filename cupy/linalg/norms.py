@@ -103,7 +103,7 @@ def norm(x, ord=None, axis=None, keepdims=False):
         if ord == numpy.Inf:
             return _absmax_fast(x, axis=axis, keepdims=keepdims)
         elif ord == -numpy.Inf:
-            return _absmin_fast(axis=axis, keepdims=keepdims)
+            return _absmin_fast(x, axis=axis, keepdims=keepdims)
         elif ord == 0:
             # Zero norm
             return _l0_fast(x, axis=axis, keepdims=keepdims)
