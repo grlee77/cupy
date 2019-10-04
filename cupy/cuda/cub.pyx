@@ -43,7 +43,7 @@ cdef extern from 'cupy_cub.h':
 ###############################################################################
 
 
-def reduce_sum(core.ndarray x, out=None):
+def reduce_sum(core.ndarray x, out=None, bint keepdims=False):
     cdef core.ndarray y
     cdef core.ndarray ws
     cdef int dtype_id, ndim_out
@@ -65,13 +65,21 @@ def reduce_sum(core.ndarray x, out=None):
     ws = core.ndarray(ws_size, numpy.int8)
     ws_ptr = <void *>ws.data.ptr
     cub_reduce_sum(x_ptr, y_ptr, x.size, ws_ptr, ws_size, dtype_id)
+    if keepdims:
+        y = y.reshape((1,))
     if out is not None:
         out[...] = y
         y = out
     return y
 
 
-def can_use_reduce_sum(x_dtype, dtype=None):
+cpdef bint _cub_axis_compatible(axis, Py_ssize_t ndim):
+    if ((axis is None) or ndim == 1 or axis == tuple(range(ndim))):
+        return True
+    return False
+
+
+def can_use_reduce_sum(x_dtype, Py_ssize_t ndim, dtype=None, axis=None):
     if dtype is None:
         # auto dtype:
         # CUB reduce_sum does not support dtype promotion.
@@ -87,10 +95,10 @@ def can_use_reduce_sum(x_dtype, dtype=None):
         return False
     if x_dtype not in support_dtype:
         return False
-    return True
+    return _cub_axis_compatible(axis, ndim)
 
 
-def reduce_min(core.ndarray x, out=None):
+def reduce_min(core.ndarray x, out=None, bint keepdims=False):
     cdef core.ndarray y
     cdef core.ndarray ws
     cdef int dtype_id, ndim_out
@@ -112,13 +120,15 @@ def reduce_min(core.ndarray x, out=None):
     ws = core.ndarray(ws_size, numpy.int8)
     ws_ptr = <void *>ws.data.ptr
     cub_reduce_min(x_ptr, y_ptr, x.size, ws_ptr, ws_size, dtype_id)
+    if keepdims:
+        y = y.reshape((1,))
     if out is not None:
         out[...] = y
         y = out
     return y
 
 
-def can_use_reduce_min(x_dtype, dtype=None):
+def can_use_reduce_min(x_dtype, Py_ssize_t ndim, dtype=None, axis=None):
     if dtype is None or dtype == x_dtype:
         support_dtype = [numpy.int8, numpy.uint8, numpy.int16, numpy.uint16,
                          numpy.int32, numpy.uint32, numpy.int64, numpy.uint64,
@@ -127,10 +137,10 @@ def can_use_reduce_min(x_dtype, dtype=None):
         return False
     if x_dtype not in support_dtype:
         return False
-    return True
+    return _cub_axis_compatible(axis, ndim)
 
 
-def reduce_max(core.ndarray x, out=None):
+def reduce_max(core.ndarray x, out=None, bint keepdims=False):
     cdef core.ndarray y
     cdef core.ndarray ws
     cdef int dtype_id, ndim_out
@@ -152,13 +162,15 @@ def reduce_max(core.ndarray x, out=None):
     ws = core.ndarray(ws_size, numpy.int8)
     ws_ptr = <void *>ws.data.ptr
     cub_reduce_max(x_ptr, y_ptr, x.size, ws_ptr, ws_size, dtype_id)
+    if keepdims:
+        y = y.reshape((1,))
     if out is not None:
         out[...] = y
         y = out
     return y
 
 
-def can_use_reduce_max(x_dtype, dtype=None):
+def can_use_reduce_max(x_dtype, Py_ssize_t ndim, dtype=None, axis=None):
     if dtype is None or dtype == x_dtype:
         support_dtype = [numpy.int8, numpy.uint8, numpy.int16, numpy.uint16,
                          numpy.int32, numpy.uint32, numpy.int64, numpy.uint64,
@@ -167,7 +179,7 @@ def can_use_reduce_max(x_dtype, dtype=None):
         return False
     if x_dtype not in support_dtype:
         return False
-    return True
+    return _cub_axis_compatible(axis, ndim)
 
 
 def _get_dtype_id(dtype):
