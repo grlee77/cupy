@@ -46,11 +46,16 @@ cdef extern from 'cupy_cub.h':
 def reduce_sum(core.ndarray x, out=None):
     cdef core.ndarray y
     cdef core.ndarray ws
-    cdef int dtype_id
+    cdef int dtype_id, ndim_out
     cdef size_t ws_size
     cdef void *x_ptr
     cdef void *y_ptr
     cdef void *ws_ptr
+    ndim_out = keepdims
+    if out is not None and out.ndim != ndim_out:
+        raise ValueError(
+            "output parameter for reduction operation sum has the wrong "
+            "number of dimensions")
     x = core.ascontiguousarray(x)
     y = core.ndarray((), x.dtype)
     x_ptr = <void *>x.data.ptr
@@ -88,11 +93,16 @@ def can_use_reduce_sum(x_dtype, dtype=None):
 def reduce_min(core.ndarray x, out=None):
     cdef core.ndarray y
     cdef core.ndarray ws
-    cdef int dtype_id
+    cdef int dtype_id, ndim_out
     cdef size_t ws_size
     cdef void *x_ptr
     cdef void *y_ptr
     cdef void *ws_ptr
+    ndim_out = keepdims
+    if out is not None and out.ndim != ndim_out:
+        raise ValueError(
+            "output parameter for reduction operation sum has the wrong "
+            "number of dimensions")
     x = core.ascontiguousarray(x)
     y = core.ndarray((), x.dtype)
     x_ptr = <void *>x.data.ptr
@@ -123,11 +133,16 @@ def can_use_reduce_min(x_dtype, dtype=None):
 def reduce_max(core.ndarray x, out=None):
     cdef core.ndarray y
     cdef core.ndarray ws
-    cdef int dtype_id
+    cdef int dtype_id, ndim_out
     cdef size_t ws_size
     cdef void *x_ptr
     cdef void *y_ptr
     cdef void *ws_ptr
+    ndim_out = keepdims
+    if out is not None and out.ndim != ndim_out:
+        raise ValueError(
+            "output parameter for reduction operation sum has the wrong "
+            "number of dimensions")
     x = core.ascontiguousarray(x)
     y = core.ndarray((), x.dtype)
     x_ptr = <void *>x.data.ptr
