@@ -3,7 +3,8 @@ import numpy
 import cupy
 
 
-def correlate(input, weights, output=None, mode='reflect', cval=0.0, origin=0):
+def correlate(input, weights, output=None, mode='reflect', cval=0.0, origin=0,
+              single_precision=False):
     """Multi-dimensional correlate.
 
     The array is correlated with the given kernel.
@@ -23,6 +24,8 @@ def correlate(input, weights, output=None, mode='reflect', cval=0.0, origin=0):
             placement of the filter, relative to the center of the current
             element of the input. Default of 0 is equivalent to
             ``(0,)*input.ndim``.
+        single_precision (bool, optional): If True, allow single-precision
+            computations when the input is single precision.
 
     Returns:
         cupy.ndarray: The result of correlate.
@@ -30,10 +33,11 @@ def correlate(input, weights, output=None, mode='reflect', cval=0.0, origin=0):
     .. seealso:: :func:`scipy.ndimage.correlate`
     """
     return _correlate_or_convolve(input, weights, output, mode, cval, origin,
-                                  False)
+                                  False, single_precision)
 
 
-def convolve(input, weights, output=None, mode='reflect', cval=0.0, origin=0):
+def convolve(input, weights, output=None, mode='reflect', cval=0.0, origin=0,
+             single_precision=False):
     """Multi-dimensional convolution.
 
     The array is convolved with the given kernel.
@@ -53,6 +57,8 @@ def convolve(input, weights, output=None, mode='reflect', cval=0.0, origin=0):
             placement of the filter, relative to the center of the current
             element of the input. Default of 0 is equivalent to
             ``(0,)*input.ndim``.
+        single_precision (bool, optional): If True, allow single-precision
+            computations when the input is single precision.
 
     Returns:
         cupy.ndarray: The result of convolution.
@@ -60,27 +66,40 @@ def convolve(input, weights, output=None, mode='reflect', cval=0.0, origin=0):
     .. seealso:: :func:`scipy.ndimage.convolve`
     """
     return _correlate_or_convolve(input, weights, output, mode, cval, origin,
-                                  True)
+                                  True, single_precision)
 
 
-def _get_output(output, input, shape=None):
+def _get_output(output, input, weights_dtype, shape=None):
     if shape is None:
         shape = input.shape
     if isinstance(output, cupy.ndarray):
         if output.shape != tuple(shape):
-            raise ValueError('output shape is not correct')
+            raise RuntimeError('output shape is not correct')
+        if output is input:
+            raise RuntimeError('in-place convolution not supported')
+        if ((input.dtype.kind == 'c' or weights_dtype.kind == 'c') and
+                output.dtype.kind != 'c'):
+            raise RuntimeError(
+                'output must have complex dtype if either the input or '
+                'weights are complex-valued.')
     else:
         dtype = output
         if dtype is None:
-            dtype = input.dtype
+            if weights_dtype.kind == 'c':
+                dtype = cupy.result_type(input.dtype, cupy.complex64)
+            else:
+                dtype = input.dtype
+        elif ((input.dtype.kind == 'c' or weights_dtype.kind == 'c') and
+                output.dtype.kind != 'c'):
+            raise RuntimeError(
+                'output must have complex dtype if either the input or '
+                'weights are complex-valued.')
         output = cupy.zeros(shape, dtype)
     return output
 
 
 def _correlate_or_convolve(input, weights, output, mode, cval, origin,
-                           convolution):
-    if input.dtype in (numpy.complex64, numpy.complex128, numpy.complex256):
-        raise TypeError('Complex type not supported.')
+                           convolution, single_precision):
     if not hasattr(origin, '__getitem__'):
         origin = [origin, ] * input.ndim
     else:
@@ -101,14 +120,27 @@ def _correlate_or_convolve(input, weights, output, mode, cval, origin,
         msg = 'boundary mode not supported (actual: {}).'.format(mode)
         raise RuntimeError(msg)
 
-    output = _get_output(output, input)
+    if weights.dtype.kind == 'c' or input.dtype.kind == 'c':
+        if single_precision:
+            weights_dtype = cupy.result_type(input.real.dtype, cupy.complex64)
+        else:
+            weights_dtype = cupy.complex128
+    else:
+        if single_precision:
+            weights_dtype = cupy.result_type(input.real.dtype, cupy.float32)
+        else:
+            weights_dtype = cupy.float64
+    weights_dtype = cupy.dtype(weights_dtype)
+
+#    if output is input:
+#        input = input.copy()
+    output = _get_output(output, input, weights_dtype)
     if weights.size == 0:
         return output
+    weights = cupy.ascontiguousarray(weights, weights_dtype)
+
     input = cupy.ascontiguousarray(input)
-    weights = cupy.ascontiguousarray(weights, cupy.float64)
-    # weights is always casted to float64 in order to get an output compatible
-    # with SciPy, thought float32 might be sufficient when input dtype is low
-    # precision.
+
     in_params, out_params, operation, name = _generate_correlete_kernel(
         input.ndim, mode, cval, input.shape, wshape, origin)
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)(

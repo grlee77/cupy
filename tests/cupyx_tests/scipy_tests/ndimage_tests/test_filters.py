@@ -72,6 +72,71 @@ class TestConvolveAndCorrelate(unittest.TestCase):
         return self._filter(xp, scp, a, w)
 
 
+@testing.parameterize(*(
+    testing.product({
+        'shape': [(3, 4), ],
+        'ksize': [3, ],
+        'mode': ['reflect', 'constant'],
+        'adtype': [numpy.int32, numpy.float32, numpy.float64, numpy.complex64,
+                   numpy.complex128],
+        'wdtype': [numpy.int32, numpy.float32, numpy.float64, numpy.complex64,
+                   numpy.complex128],
+        'output': [None],
+        'filter': ['convolve', 'correlate'],
+        'single_precision': [True, False],
+    })
+))
+@testing.gpu
+@testing.with_requires('scipy')
+class TestConvolveAndCorrelateComplex(unittest.TestCase):
+
+    def _filter(self, xp, scp, a, w):
+        filter = getattr(scp.ndimage, self.filter)
+        return filter(a, w, output=self.output, mode=self.mode,
+                      single_precision=self.single_precision)
+
+    def test_convolve_and_correlate_complex(self):
+        a = testing.shaped_random(self.shape, cupy, self.adtype)
+        if self.wdtype is None:
+            wdtype = self.adtype
+        else:
+            wdtype = self.wdtype
+        w = testing.shaped_random((self.ksize,) * a.ndim, cupy, wdtype)
+
+        rtol = atol = 1e-5
+        # The expected output in complex-valued cases can be computed from a
+        # linear combination of real-valued convolution.
+        if a.dtype.kind == 'c' and w.dtype.kind != 'c':
+            # complex data, real filter
+            expected_out = (
+                self._filter(cupy, cupyx.scipy, a.real, w) +
+                1j * self._filter(cupy, cupyx.scipy, a.imag, w))
+        elif a.dtype.kind != 'c' and w.dtype.kind == 'c':
+            # real data, complex filter
+            a_float = a.astype(cupy.result_type(a.dtype, cupy.float32))
+            expected_out = (
+                self._filter(cupy, cupyx.scipy, a_float, w.real) +
+                1j * self._filter(cupy, cupyx.scipy, a_float, w.imag))
+        elif a.dtype.kind == 'c' and w.dtype.kind == 'c':
+            # complex data, complex filter
+            expected_out = (
+                self._filter(cupy, cupyx.scipy, a.real, w.real) +
+                1j * self._filter(cupy, cupyx.scipy, a.real, w.imag) +
+                1j * self._filter(cupy, cupyx.scipy, a.imag, w.real) -
+                self._filter(cupy, cupyx.scipy, a.imag, w.imag)
+            )
+        else:
+            # real data, real filter cases compared to SciPy in other classes
+            return
+
+        out = self._filter(cupy, cupyx.scipy, a, w)
+
+        testing.assert_allclose(
+            out,
+            expected_out,
+            rtol=rtol, atol=atol)
+
+
 @testing.parameterize(*testing.product({
     'ndim': [2, 3],
     'dtype': [numpy.int32, numpy.float64],
@@ -81,15 +146,43 @@ class TestConvolveAndCorrelate(unittest.TestCase):
 @testing.with_requires('scipy')
 class TestConvolveAndCorrelateSpecialCases(unittest.TestCase):
 
-    def _filter(self, scp, a, w, mode='reflect', origin=0):
+    def _filter(self, scp, a, w, mode='reflect', origin=0, output=None):
         filter = getattr(scp.ndimage, self.filter)
-        return filter(a, w, mode=mode, origin=origin)
+        return filter(a, w, mode=mode, origin=origin, output=output)
 
     @testing.numpy_cupy_allclose(atol=1e-5, rtol=1e-5, scipy_name='scp')
     def test_weights_with_size_zero_dim(self, xp, scp):
         a = testing.shaped_random((3, ) * self.ndim, xp, self.dtype)
         w = testing.shaped_random((0, ) + (3, ) * self.ndim, xp, self.dtype)
         return self._filter(scp, a, w)
+
+    @testing.numpy_cupy_allclose(atol=1e-5, rtol=1e-5, scipy_name='scp')
+    def test_array_output(self, xp, scp):
+        a = testing.shaped_random((3, ) * self.ndim, xp, self.dtype)
+        w = testing.shaped_random((3, ) * self.ndim, xp, self.dtype)
+        output = xp.empty_like(a)
+        return self._filter(scp, a, w, output=output)
+
+    # @testing.numpy_cupy_allclose(atol=1e-5, rtol=1e-5, scipy_name='scp')
+    # def test_inplace_output(self, xp, scp):
+    #     a = testing.shaped_random((3, ) * self.ndim, xp, self.dtype)
+    #     w = testing.shaped_random((3, ) * self.ndim, xp, self.dtype)
+    #     return self._filter(scp, a, w, output=a)
+
+    # TODO: SciPy works without error in this case
+    def test_invalid_inplace_output(self):
+        a = testing.shaped_random((3, ) * self.ndim, cupy, self.dtype)
+        w = testing.shaped_random((3, ) * self.ndim, cupy, self.dtype)
+        with self.assertRaises(RuntimeError):
+            return self._filter(cupyx.scipy, a, w, output=a)
+
+    @testing.numpy_cupy_raises(scipy_name='scp')
+    def test_invalid_output_shape(self, xp, scp):
+        a = testing.shaped_random((3, ) * self.ndim, xp, self.dtype)
+        w = testing.shaped_random((3, ) * self.ndim, xp, self.dtype)
+        output_shape = (2,) * self.ndim  # wrong shape
+        output = xp.zeros(output_shape, dtype=a.dtype)
+        self._filter(scp, a, w, output=output)
 
     def test_invalid_shape_weights(self):
         a = testing.shaped_random((3, ) * self.ndim, cupy, self.dtype)
