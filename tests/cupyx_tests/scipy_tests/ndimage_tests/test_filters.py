@@ -140,7 +140,7 @@ class TestConvolveAndCorrelateComplex(unittest.TestCase):
 @testing.parameterize(*testing.product({
     'ndim': [2, 3],
     'dtype': [numpy.int32, numpy.float64],
-    'filter': ['convolve', 'correlate']
+    'filter': ['convolve', 'correlate'],
 }))
 @testing.gpu
 @testing.with_requires('scipy')
