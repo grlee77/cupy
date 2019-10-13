@@ -74,9 +74,8 @@ cdef ndarray _ndarray_prod(ndarray self, axis, dtype, out, keepdims):
 
 cdef ndarray _ndarray_sum(ndarray self, axis, dtype, out, keepdims):
     if cupy.cuda.cub_enabled:
-        if (cub.can_use_reduce_sum(self.dtype, dtype) and (axis is None)
-                and (not keepdims)):
-            return cub.reduce_sum(self, out=out)
+        if cub.can_use_reduce_sum(self.dtype, self.ndim, dtype, axis):
+            return cub.reduce_sum(self, out=out, keepdims=keepdims)
     if dtype is None:
         return _sum_auto_dtype(self, axis, dtype, out, keepdims)
     else:
@@ -491,14 +490,8 @@ cdef _power_preamble = '''
 template <typename T>
 inline __device__ T integral_power(T in0, T in1) {
     if (in1 < 0) {
-        switch (in0) {
-            case -1:
-                return in1 & 1 ? -1 : 1;
-            case 1:
-                return 1;
-            default:
-                return 0;
-        }
+        if (in0 == -1) {return (in1 & 1) ? -1 : 1;}
+        else {return (in0 == 1) ? 1 : 0;}
     }
     T out0 = 1;
     while (in1 > 0) {

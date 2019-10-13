@@ -30,8 +30,8 @@ cdef class PointerAttributes:
 # Extern
 ###############################################################################
 cdef extern from *:
-    ctypedef int DeviceAttr 'enum cudaDeviceAttr'
-    ctypedef int MemoryAdvise 'enum cudaMemoryAdvise'
+    ctypedef int DeviceAttr 'cudaDeviceAttr'
+    ctypedef int MemoryAdvise 'cudaMemoryAdvise'
 
     ctypedef void StreamCallbackDef(
         driver.Stream stream, Error status, void* userData)
@@ -41,7 +41,7 @@ cdef extern from *:
 cdef extern from 'cupy_cuda.h' nogil:
 
     # Types
-    struct _PointerAttributes 'cudaPointerAttributes':
+    ctypedef struct _PointerAttributes 'cudaPointerAttributes':
         int device
         void* devicePointer
         void* hostPointer
@@ -60,6 +60,8 @@ cdef extern from 'cupy_cuda.h' nogil:
     # Device operations
     int cudaGetDevice(int* device)
     int cudaDeviceGetAttribute(int* value, DeviceAttr attr, int device)
+    int cudaDeviceGetByPCIBusId(int* device, const char* pciBusId)
+    int cudaDeviceGetPCIBusId(char* pciBusId, int len, int device)
     int cudaGetDeviceCount(int* count)
     int cudaSetDevice(int device)
     int cudaDeviceSynchronize()
@@ -156,6 +158,15 @@ cdef extern from 'cupy_cuda.h' nogil:
     int cudaGetTextureObjectResourceDesc(ResourceDesc* desc, TextureObject obj)
     int cudaGetTextureObjectTextureDesc(TextureDesc* desc, TextureObject obj)
 
+    bint hip_environment
+    int cudaDevAttrComputeCapabilityMajor
+    int cudaDevAttrComputeCapabilityMinor
+
+_is_hip_environment = hip_environment
+is_hip = hip_environment
+deviceAttributeComputeCapabilityMajor = cudaDevAttrComputeCapabilityMajor
+deviceAttributeComputeCapabilityMinor = cudaDevAttrComputeCapabilityMinor
+
 
 ###############################################################################
 # Error codes
@@ -225,6 +236,24 @@ cpdef int deviceGetAttribute(int attrib, int device) except? -1:
     check_status(status)
     return ret
 
+cpdef int deviceGetByPCIBusId(str pci_bus_id) except? -1:
+    # Encode the python string before passing to native code
+    byte_pci_bus_id = pci_bus_id.encode('ascii')
+    cdef const char* c_pci_bus_id = byte_pci_bus_id
+
+    cdef int device = -1
+    status = cudaDeviceGetByPCIBusId(&device, c_pci_bus_id)
+    check_status(status)
+    return device
+
+cpdef str deviceGetPCIBusId(int device):
+    # The PCI Bus ID string must be able to store 13 characters including the
+    # NULL-terminator according to the CUDA documentation.
+    # https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__DEVICE.html
+    cdef char pci_bus_id[13]
+    status = cudaDeviceGetPCIBusId(pci_bus_id, 13, device)
+    check_status(status)
+    return pci_bus_id.decode('ascii')
 
 cpdef int getDeviceCount() except? -1:
     cdef int count
