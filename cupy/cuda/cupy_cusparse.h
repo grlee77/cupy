@@ -564,20 +564,20 @@ cusparseStatus_t cusparseZcsrilu02_bufferSize(...) {
   return CUSPARSE_STATUS_SUCCESS;
 }
 
-cusparseStatus_t cusparseScsrilu02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseScsrilu02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
-cusparseStatus_t cusparseDcsrilu02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseDcsrilu02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
-cusparseStatus_t cusparseCcsrilu02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseCcsrilu02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
-cusparseStatus_t cusparseZcsrilu02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
+// cusparseStatus_t cusparseZcsrilu02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
 }
 
 cusparseStatus_t cusparseScsrilu02_analysis(...) {
@@ -648,21 +648,21 @@ cusparseStatus_t cusparseZbsrilu02_bufferSize(...) {
   return CUSPARSE_STATUS_SUCCESS;
 }
 
-cusparseStatus_t cusparseSbsrilu02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseSbsrilu02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
-cusparseStatus_t cusparseDbsrilu02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseDbsrilu02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
-cusparseStatus_t cusparseCbsrilu02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseCbsrilu02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
-cusparseStatus_t cusparseZbsrilu02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseZbsrilu02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
 cusparseStatus_t cusparseSbsrilu02_analysis(...) {
   return CUSPARSE_STATUS_SUCCESS;
@@ -716,21 +716,21 @@ cusparseStatus_t cusparseZcsric02_bufferSize(...) {
   return CUSPARSE_STATUS_SUCCESS;
 }
 
-cusparseStatus_t cusparseScsric02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseScsric02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
-cusparseStatus_t cusparseDcsric02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseDcsric02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
-cusparseStatus_t cusparseCcsric02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseCcsric02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
-cusparseStatus_t cusparseZcsric02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseZcsric02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
 cusparseStatus_t cusparseScsric02_analysis(...) {
   return CUSPARSE_STATUS_SUCCESS;
@@ -784,21 +784,21 @@ cusparseStatus_t cusparseZbsric02_bufferSize(...) {
   return CUSPARSE_STATUS_SUCCESS;
 }
 
-cusparseStatus_t cusparseSbsric02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseSbsric02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
-cusparseStatus_t cusparseDbsric02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseDbsric02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
-cusparseStatus_t cusparseCbsric02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseCbsric02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
-cusparseStatus_t cusparseZbsric02_bufferSizeExt(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
+// cusparseStatus_t cusparseZbsric02_bufferSizeExt(...) {
+//   return CUSPARSE_STATUS_SUCCESS;
+// }
 
 cusparseStatus_t cusparseSbsric02_analysis(...) {
   return CUSPARSE_STATUS_SUCCESS;
