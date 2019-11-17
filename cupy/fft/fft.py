@@ -1,4 +1,6 @@
 from copy import copy
+from functools import reduce
+from operator import mul
 from threading import get_ident
 
 import six
@@ -10,6 +12,7 @@ from cupy.cuda import cufft
 from math import sqrt
 from cupy.fft import cache
 from cupy.fft import config
+from mrrt.utils import profile
 
 
 def _output_dtype(a, value_type):
@@ -33,6 +36,7 @@ def _convert_dtype(a, value_type):
     return a.astype(out_dtype, copy=False)
 
 
+@profile
 def _cook_shape(a, s, axes, value_type, order='C'):
     if s is None or s == a.shape:
         return a
@@ -220,14 +224,15 @@ def _prep_fftn_axes(ndim, s=None, axes=None, plan_nd_check=False):
     if (s is not None) and len(s) != len(axes):
         raise ValueError("Shape and axes have different lengths.")
 
-    if np.min(axes) < -ndim or np.max(axes) > ndim - 1:
+    if reduce(min, axes) < -ndim or reduce(max, axes) > ndim - 1:
         raise ValueError("The specified axes exceed the array dimensions.")
 
     # sort the provided axes in ascending order
-    axes = tuple(sorted(np.mod(axes, ndim)))
+    axes = tuple([ax % ndim for ax in axes])
 
     if plan_nd_check:
-        if not np.all(np.diff(axes) == 1):
+        if not all((ax - ax_prev) == 1
+                   for ax, ax_prev in zip(axes[1:], axes[:-1])):
             raise ValueError(
                 "The axes to be transformed must be contiguous and repeated "
                 "axes are not allowed.")
@@ -250,6 +255,7 @@ def _prep_fftn_axes(ndim, s=None, axes=None, plan_nd_check=False):
     return axes, nd_plan_possible
 
 
+@profile
 def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
     """Generate a CUDA FFT plan for transforming up to three axes.
 
@@ -305,13 +311,13 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
     input[b * idist + ((x * inembed[1] + y) * inembed[2] + z) * istride]
     output[b * odist + ((x * onembed[1] + y) * onembed[2] + z) * ostride]
     """
-    if fft_axes == tuple(np.arange(ndim)):
+    if fft_axes == tuple(range(ndim)):
         # tranfsorm over all axes
         plan_dimensions = copy(shape)
         if order == 'F':
             plan_dimensions = plan_dimensions[::-1]
-        idist = np.intp(np.prod(shape))
-        odist = np.intp(np.prod(shape))
+        idist = np.intp(reduce(mul, shape))
+        odist = np.intp(reduce(mul, shape))
         istride = ostride = 1
         inembed = onembed = None
         nbatch = 1
@@ -323,16 +329,15 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
         plan_dimensions = tuple(plan_dimensions)
         if order == 'F':
             plan_dimensions = plan_dimensions[::-1]
-        inembed = tuple(np.asarray(plan_dimensions, dtype=int))
-        onembed = tuple(np.asarray(plan_dimensions, dtype=int))
+        inembed = onembed = plan_dimensions
         if 0 not in fft_axes:
             # don't FFT along the first min_axis_fft axes
-            min_axis_fft = np.min(fft_axes)
-            nbatch = np.prod(shape[:min_axis_fft])
+            min_axis_fft = reduce(min, fft_axes)
+            nbatch = reduce(mul, shape[:min_axis_fft])
             if order == 'C':
                 # C-ordered GPU array with batch along first dim
-                idist = np.prod(plan_dimensions)
-                odist = np.prod(plan_dimensions)
+                idist = reduce(mul, plan_dimensions)
+                odist = reduce(mul, plan_dimensions)
                 istride = 1
                 ostride = 1
             elif order == 'F':
@@ -344,7 +349,7 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
         elif (ndim - 1) not in fft_axes:
             # don't FFT along the last axis
             num_axes_batch = ndim - len(fft_axes)
-            nbatch = np.prod(shape[-num_axes_batch:])
+            nbatch = reduce(mul, shape[-num_axes_batch:])
             if order == 'C':
                 # C-ordered GPU array with batch along last dim
                 idist = 1
@@ -353,8 +358,8 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
                 ostride = nbatch
             elif order == 'F':
                 # F-ordered GPU array with batch along last dim
-                idist = np.prod(plan_dimensions)
-                odist = np.prod(plan_dimensions)
+                idist = reduce(mul, plan_dimensions)
+                odist = reduce(mul, plan_dimensions)
                 istride = 1
                 ostride = 1
         else:
@@ -384,7 +389,6 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
             plan = None
 
     if not cache.is_enabled() or plan is None:
-
         plan = cufft.PlanNd(shape=plan_dimensions,
                             istride=istride,
                             ostride=ostride,
@@ -394,9 +398,13 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
                             odist=odist,
                             fft_type=fft_type,
                             batch=nbatch)
+        if cache.is_enabled():
+            cache._cufft_cache.insert(plan, key)
+
     return plan
 
 
+@profile
 def _exec_fftn(a, direction, value_type, norm, axes, overwrite_x,
                plan=None, out=None):
 
@@ -404,7 +412,7 @@ def _exec_fftn(a, direction, value_type, norm, axes, overwrite_x,
     if fft_type not in [cufft.CUFFT_C2C, cufft.CUFFT_Z2Z]:
         raise NotImplementedError('Only C2C and Z2Z are supported.')
 
-    if a.base is not None:
+    if a.base is not None and not overwrite_x:  # TODO: GRL check this logic. Do we need the copy here at all?
         a = a.copy()
     if a.flags.c_contiguous:
         order = 'C'
@@ -446,7 +454,7 @@ def _exec_fftn(a, direction, value_type, norm, axes, overwrite_x,
     plan.fft(a, out, direction)
 
     # normalize by the product of the shape along the transformed axes
-    sz = np.prod([out.shape[ax] for ax in axes])
+    sz = reduce(mul, [out.shape[ax] for ax in axes])
     if norm is None:
         if direction == cufft.CUFFT_INVERSE:
             out /= sz
@@ -455,7 +463,7 @@ def _exec_fftn(a, direction, value_type, norm, axes, overwrite_x,
 
     return out
 
-
+@profile
 def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
           overwrite_x=False, out=None):
     if norm not in (None, 'ortho'):
