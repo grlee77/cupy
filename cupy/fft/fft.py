@@ -412,7 +412,7 @@ def _exec_fftn(a, direction, value_type, norm, axes, overwrite_x,
     if fft_type not in [cufft.CUFFT_C2C, cufft.CUFFT_Z2Z]:
         raise NotImplementedError('Only C2C and Z2Z are supported.')
 
-    if a.base is not None and not overwrite_x:  # TODO: GRL check this logic. Do we need the copy here at all?
+    if a.base is not None:
         a = a.copy()
     if a.flags.c_contiguous:
         order = 'C'
