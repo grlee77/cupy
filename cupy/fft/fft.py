@@ -12,7 +12,6 @@ from cupy.cuda import cufft
 from math import sqrt
 from cupy.fft import cache
 from cupy.fft import config
-from mrrt.utils import profile
 
 
 def _output_dtype(a, value_type):
@@ -36,7 +35,6 @@ def _convert_dtype(a, value_type):
     return a.astype(out_dtype, copy=False)
 
 
-@profile
 def _cook_shape(a, s, axes, value_type, order='C'):
     if s is None or s == a.shape:
         return a
@@ -255,7 +253,6 @@ def _prep_fftn_axes(ndim, s=None, axes=None, plan_nd_check=False):
     return axes, nd_plan_possible
 
 
-@profile
 def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
     """Generate a CUDA FFT plan for transforming up to three axes.
 
@@ -404,7 +401,6 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
     return plan
 
 
-@profile
 def _exec_fftn(a, direction, value_type, norm, axes, overwrite_x,
                plan=None, out=None):
 
@@ -463,7 +459,7 @@ def _exec_fftn(a, direction, value_type, norm, axes, overwrite_x,
 
     return out
 
-@profile
+
 def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
           overwrite_x=False, out=None):
     if norm not in (None, 'ortho'):
