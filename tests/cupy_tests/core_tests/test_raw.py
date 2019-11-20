@@ -94,6 +94,30 @@ __global__ void multiply_by_const(float* x, int N) {
         x[id] *= some_array[id];
     }
 }
+
+}
+'''
+
+# dynamic parallelism
+_test_source4 = r'''
+extern "C"{
+
+__global__ void test_kernel_inner(float *arr, int N)
+{
+    unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (tid < N)
+        arr[tid] = 1.0;
+}
+
+__global__ void test_kernel(float *arr, int N, int inner_blk)
+{
+    unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (tid < N/inner_blk)
+        test_kernel_inner<<<1, inner_blk>>>(arr+tid*inner_blk, inner_blk);
+}
+
 }
 '''
 
@@ -355,7 +379,7 @@ class TestRaw(unittest.TestCase):
         # this error is more likely to appear when using RawModule, so
         # let us do it here
         with pytest.raises(cupy.cuda.driver.CUDADriverError) as ex:
-            self.mod2.get_function("no_such_kernel")
+            self.mod2.get_function('no_such_kernel')
         assert 'CUDA_ERROR_NOT_FOUND' in str(ex.value)
 
     def test_const_memory(self):
@@ -368,6 +392,30 @@ class TestRaw(unittest.TestCase):
         output_arr = cupy.ones(100, dtype=cupy.float32)
         ker((1,), (100,), (output_arr, cupy.int32(100)))
         assert (const_data == output_arr).all()
+
+    def test_dynamical_parallelism(self):
+        ker = cupy.RawKernel(_test_source4, 'test_kernel', options=('-dc',),
+                             backend=self.backend)
+        N = 169
+        inner_chunk = 13
+        x = cupy.zeros((N,), dtype=cupy.float32)
+        ker((1,), (N//inner_chunk,), (x, N, inner_chunk))
+        assert (x == 1.0).all()
+
+    def test_dynamical_parallelism_compile_failure(self):
+        # no option for separate compilation is given should cause an error
+        ker = cupy.RawKernel(_test_source4, 'test_kernel',
+                             backend=self.backend)
+        N = 10
+        inner_chunk = 2
+        x = cupy.zeros((N,), dtype=cupy.float32)
+        if self.backend == 'nvrtc':
+            # raised when calling ls.complete()
+            with pytest.raises(cupy.cuda.driver.CUDADriverError):
+                ker((1,), (N//inner_chunk,), (x, N, inner_chunk))
+        else:  # nvcc
+            with pytest.raises(cupy.cuda.compiler.CompileException):
+                ker((1,), (N//inner_chunk,), (x, N, inner_chunk))
 
     def test_cuFloatComplex(self):
         N = 100
