@@ -46,10 +46,14 @@ cdef extern from 'cupy_cub.h':
                            int, int)
     void cub_device_segmented_reduce(void*, size_t&, void*, void*, int, void*,
                                      void*, Stream_t, int, int)
+    void cub_device_spmv(void*, size_t&, void*, void*, void*, void*, void*,
+                         int, int, int, Stream_t, int)
     size_t cub_device_reduce_get_workspace_size(void*, void*, int, Stream_t,
                                                 int, int)
     size_t cub_device_segmented_reduce_get_workspace_size(
         void*, void*, int, void*, void*, Stream_t, int, int)
+    size_t cub_device_spmv_get_workspace_size(
+        void*, void*, void*, void*, void*, int, int, int, Stream_t, int)
 
 ###############################################################################
 # Python interface
@@ -197,6 +201,54 @@ def device_segmented_reduce(ndarray x, op, axis, out=None,
     if out is not None:
         out[...] = y
         y = out
+    return y
+
+
+def device_csrmv(csr_mat, ndarray x):
+    cdef ndarray y, ws
+    cdef void* values_ptr
+    cdef void* row_offsets_ptr
+    cdef void* col_indices_ptr
+    cdef void* x_ptr
+    cdef void* y_ptr
+    cdef void* ws_ptr
+    cdef int dtype_id, n_rows, n_cols, nnz
+    cdef size_t ws_size
+    cdef Stream_t s
+
+    if x.ndim != 1:
+        raise ValueError('array must be 1d')
+
+    # CSR matrix attributes
+    n_rows, n_cols = csr_mat.shape
+    nnz = csr_mat.nnz
+    values_ptr = <void*>csr_mat.data.data.ptr
+    row_offsets_ptr = <void*>csr_mat.indptr.data.ptr
+    col_indices_ptr = <void*>csr_mat.indices.data.ptr
+
+    # x must have shape and dtype matching the CSR matrix
+    if x.size != n_cols:
+        raise ValueError("size of array does not match the CSR matrix")
+    x = x.astype(csr_mat.dtype, copy=False)
+
+    # input (x) and output (y) vectors
+    x_ptr = <void*>x.data.ptr
+    y = ndarray((n_rows,), dtype=x.dtype)
+    y_ptr = <void*>y.data.ptr
+
+    s = <Stream_t>stream.get_current_stream_ptr()
+    dtype_id = _get_dtype_id(x.dtype)
+
+    # get workspace size and then fire up
+    ws_size = cub_device_spmv_get_workspace_size(
+        values_ptr, row_offsets_ptr, col_indices_ptr, x_ptr, y_ptr, n_rows,
+        n_cols, nnz, s, dtype_id)
+    ws = ndarray(ws_size, numpy.int8)
+    ws_ptr = <void*>ws.data.ptr
+    cub_device_spmv(ws_ptr, ws_size, values_ptr, row_offsets_ptr,
+                    col_indices_ptr, x_ptr, y_ptr, n_rows, n_cols, nnz, s,
+                    dtype_id)
+
     return y
 
 
