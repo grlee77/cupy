@@ -4,7 +4,7 @@
 
 import numpy
 
-from cupy.core.core cimport array, ndarray, _internal_ascontiguousarray
+from cupy.core.core cimport ndarray, _internal_ascontiguousarray
 from cupy.cuda cimport stream
 from cupy.cuda.driver cimport Stream as Stream_t
 
@@ -226,10 +226,10 @@ def device_csrmv(csr_mat, ndarray x):
     row_offsets_ptr = <void*>csr_mat.indptr.data.ptr
     col_indices_ptr = <void*>csr_mat.indices.data.ptr
 
-    # x must have same dtype as the CSR matrix
+    # x must have shape and dtype matching the CSR matrix
     if x.size != n_cols:
         raise ValueError("size of array does not match the CSR matrix")
-    x = array(x, csr_mat.dtype, False)
+    x = x.astype(csr_mat.dtype, copy=False)
 
     # input (x) and output (y) vectors
     x_ptr = <void*>x.data.ptr
