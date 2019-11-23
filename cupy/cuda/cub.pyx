@@ -204,7 +204,7 @@ def device_segmented_reduce(ndarray x, op, axis, out=None,
     return y
 
 
-def device_csrmv(csr_mat, ndarray x):
+def device_csrmv(int n_rows, int n_cols, int nnz, ndarray values, ndarray indptr, ndarray indices, ndarray x):
     cdef ndarray y, ws
     cdef void* values_ptr
     cdef void* row_offsets_ptr
@@ -212,7 +212,7 @@ def device_csrmv(csr_mat, ndarray x):
     cdef void* x_ptr
     cdef void* y_ptr
     cdef void* ws_ptr
-    cdef int dtype_id, n_rows, n_cols, nnz
+    cdef int dtype_id  #, n_rows, n_cols, nnz
     cdef size_t ws_size
     cdef Stream_t s
 
@@ -220,24 +220,22 @@ def device_csrmv(csr_mat, ndarray x):
         raise ValueError('array must be 1d')
 
     # CSR matrix attributes
-    n_rows, n_cols = csr_mat.shape
-    nnz = csr_mat.nnz
-    values_ptr = <void*>csr_mat.data.data.ptr
-    row_offsets_ptr = <void*>csr_mat.indptr.data.ptr
-    col_indices_ptr = <void*>csr_mat.indices.data.ptr
+    values_ptr = <void*>values.data.ptr
+    row_offsets_ptr = <void*>indptr.data.ptr
+    col_indices_ptr = <void*>indices.data.ptr
 
     # x must have shape and dtype matching the CSR matrix
     if x.size != n_cols:
         raise ValueError("size of array does not match the CSR matrix")
-    x = x.astype(csr_mat.dtype, copy=False)
-
-    # input (x) and output (y) vectors
+    x = x.astype(values.dtype, "C", None, None, False)
     x_ptr = <void*>x.data.ptr
-    y = ndarray((n_rows,), dtype=x.dtype)
+
+    # prepare output array
+    y = ndarray((n_rows,), dtype=values.dtype)
     y_ptr = <void*>y.data.ptr
 
     s = <Stream_t>stream.get_current_stream_ptr()
-    dtype_id = _get_dtype_id(x.dtype)
+    dtype_id = _get_dtype_id(values.dtype)
 
     # get workspace size and then fire up
     ws_size = cub_device_spmv_get_workspace_size(
