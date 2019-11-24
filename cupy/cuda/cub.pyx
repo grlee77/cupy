@@ -204,7 +204,8 @@ def device_segmented_reduce(ndarray x, op, axis, out=None,
     return y
 
 
-def device_csrmv(int n_rows, int n_cols, int nnz, ndarray values, ndarray indptr, ndarray indices, ndarray x):
+def device_csrmv(int n_rows, int n_cols, int nnz, ndarray values,
+                 ndarray indptr, ndarray indices, ndarray x):
     cdef ndarray y, ws
     cdef void* values_ptr
     cdef void* row_offsets_ptr
@@ -212,7 +213,7 @@ def device_csrmv(int n_rows, int n_cols, int nnz, ndarray values, ndarray indptr
     cdef void* x_ptr
     cdef void* y_ptr
     cdef void* ws_ptr
-    cdef int dtype_id  #, n_rows, n_cols, nnz
+    cdef int dtype_id
     cdef size_t ws_size
     cdef Stream_t s
 

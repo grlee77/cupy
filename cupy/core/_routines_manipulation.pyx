@@ -617,7 +617,7 @@ cpdef ndarray concatenate_method(tup, int axis):
 
     if not have_same_types:
         dtype = functools.reduce(numpy.promote_types,
-                                 set(a.dtype for a in arrays))
+                                 set([a.dtype for a in arrays]))
     return _concatenate(arrays, axis, tuple(shape), dtype)
 
 
