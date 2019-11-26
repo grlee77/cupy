@@ -208,6 +208,11 @@ def _prep_fftn_axes(ndim, s=None, axes=None, plan_nd_check=False):
 
     The axes to be transformed are returned in ascending order.
     """
+
+    # compatibility checks for cupy.cuda.cufft.PlanNd
+    if (s is not None) and (axes is not None) and len(s) != len(axes):
+        raise ValueError("Shape and axes have different lengths.")
+
     if axes is None:
         if s is None:
             dim = ndim
@@ -217,10 +222,6 @@ def _prep_fftn_axes(ndim, s=None, axes=None, plan_nd_check=False):
     elif np.isscalar(axes):
         axes = (axes, )
     axes = tuple(axes)
-
-    # compatibility checks for cupy.cuda.cufft.PlanNd
-    if (s is not None) and len(s) != len(axes):
-        raise ValueError("Shape and axes have different lengths.")
 
     if reduce(min, axes) < -ndim or reduce(max, axes) > ndim - 1:
         raise ValueError("The specified axes exceed the array dimensions.")
@@ -485,6 +486,9 @@ def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
         a = cupy.ascontiguousarray(a)
     elif order == 'F' and not a.flags.f_contiguous:
         a = cupy.asfortranarray(a)
+
+    # sort the provided axes in ascending order
+    axes = tuple(sorted(np.mod(axes, a.ndim)))
 
     a = _exec_fftn(a, direction, value_type, norm=norm, axes=axes,
                    overwrite_x=overwrite_x, plan=plan, out=out)
