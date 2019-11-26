@@ -279,19 +279,16 @@ cdef bint _cub_device_segmented_reduce_axis_compatible(
     # Implementation borrowed from cupy.fft.fft._get_cufft_plan_nd().
     # This function checks if the reduced axes are contiguous.
 
-    if axis is None:
-        # this is impossible, just in case
-        raise ValueError('axis cannot be None.')
-    else:
-        # the axes to be reduced must be C- or F- contiguous
-        if not numpy.all(numpy.diff(cub_axis) == 1):
-            return False
-        if order not in ('c', 'C', 'f', 'F'):
-            return False
-        if order in ('c', 'C') and ((ndim - 1) not in cub_axis):
-            return False
-        if order in ('f', 'F') and (0 not in cub_axis):
-            return False
+    # the axes to be reduced must be C- or F- contiguous
+    if not all((ax - ax_prev) == 1
+               for ax, ax_prev in zip(cub_axis[1:], cub_axis[:-1])):
+        return False
+    if order not in ('c', 'C', 'f', 'F'):
+        return False
+    if order in ('c', 'C') and ((ndim - 1) not in cub_axis):
+        return False
+    if order in ('f', 'F') and (0 not in cub_axis):
+        return False
 
     return True
 
