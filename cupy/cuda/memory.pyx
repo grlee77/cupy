@@ -562,8 +562,7 @@ cpdef MemoryPointer alloc(size):
         ~cupy.cuda.MemoryPointer: Pointer to the allocated buffer.
 
     """
-    allocator = getattr(_thread_local, 'allocator', _current_allocator)
-    return allocator(size)
+    return get_allocator()(size)
 
 
 cpdef set_allocator(allocator=None):
@@ -580,7 +579,11 @@ cpdef set_allocator(allocator=None):
     global _current_allocator
     if allocator is None:
         allocator = _malloc
+    if getattr(_thread_local, 'allocator', None) is not None:
+        raise ValueError('Can\'t change the global allocator inside '
+                         '`using_allocator` context manager')
     _current_allocator = allocator
+
 
 cpdef get_allocator():
     """Returns the current allocator for GPU memory.
@@ -588,8 +591,14 @@ cpdef get_allocator():
     Returns:
         function: CuPy memory allocator.
     """
-    allocator = getattr(_thread_local, 'allocator', _current_allocator)
-    return allocator
+    try:
+        allocator = _thread_local.allocator
+    except AttributeError:
+        _thread_local.allocator = allocator = None
+    if allocator is None:
+        return _current_allocator
+    else:
+        return allocator
 
 
 @contextlib.contextmanager
@@ -613,8 +622,6 @@ def using_allocator(allocator=None):
         yield
     finally:
         _thread_local.allocator = previous_allocator
-        if previous_allocator is None:
-            delattr(_thread_local, 'allocator')
 
 
 @cython.final

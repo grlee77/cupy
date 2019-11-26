@@ -58,6 +58,9 @@ cdef extern from 'cupy_cufft.h' nogil:
     Result cufftExecD2Z(Handle plan, Double *idata, DoubleComplex *odata)
     Result cufftExecZ2D(Handle plan, DoubleComplex *idata, Double *odata)
 
+    # Version
+    Result cufftGetVersion(int* version)
+
 
 cdef extern from 'cupy_cufftXt.h' nogil:
     Result cufftXtMakePlanMany(Handle plan, int rank, long long int *n,
@@ -108,6 +111,13 @@ class CuFFTError(RuntimeError):
 cpdef inline check_result(int result):
     if result != 0:
         raise CuFFTError(result)
+
+
+cpdef size_t getVersion() except? -1:
+    cdef int version
+    result = cufftGetVersion(&version)
+    check_result(result)
+    return version
 
 
 class Plan1d(object):
