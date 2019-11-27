@@ -87,19 +87,31 @@ extern "C" __global__ void ${name}(${params}) {
 
 
 cpdef tuple _get_axis(object axis, Py_ssize_t ndim):
-    cdef Py_ssize_t dim
+    cdef Py_ssize_t dim, num_axes
     if axis is None:
-        axis = tuple(range(ndim))
+        return tuple(range(ndim)), ()
     elif sequence.PySequence_Check(axis):
         axis = tuple(axis)
+        num_axes = len(axis)
     else:
         axis = axis,
+        num_axes = 1
 
     for dim in axis:
         if dim < -ndim or dim >= ndim:
             raise _errors._AxisError('Axis overrun')
-    reduce_axis = tuple(sorted([dim % ndim for dim in axis]))
-    out_axis = tuple([dim for dim in range(ndim) if dim not in reduce_axis])
+    if num_axes == 1:
+        if dim < 0:
+            reduce_axis = (dim + ndim,)
+        else:
+            reduce_axis = axis
+    else:
+        reduce_axis = tuple(sorted([dim % ndim for dim in axis]))
+    if num_axes == ndim:
+        out_axis = ()
+    else:
+        out_axis = tuple(
+            [dim for dim in range(ndim) if dim not in reduce_axis])
     return reduce_axis, out_axis
 
 
