@@ -292,7 +292,7 @@ cdef bint _cub_device_segmented_reduce_axis_compatible(
     # This function checks if the reduced axes are contiguous.
 
     # the axes to be reduced must be C- or F- contiguous
-    if contig_axes(cub_axis):
+    if _contig_axes(cub_axis):
         if order in ('c', 'C'):
             return ((ndim - 1) in cub_axis)
         elif order in ('f', 'F'):
