@@ -1,6 +1,7 @@
 import numpy
 
 import cupy
+from cupy import util
 
 
 def correlate(input, weights, output=None, mode='reflect', cval=0.0, origin=0,
@@ -137,13 +138,11 @@ def _correlate_or_convolve(input, weights, output, mode, cval, origin,
     output = _get_output(output, input, weights_dtype)
     if weights.size == 0:
         return output
-    weights = cupy.ascontiguousarray(weights, weights_dtype)
 
     input = cupy.ascontiguousarray(input)
-
-    in_params, out_params, operation, name = _generate_correlete_kernel(
-        input.ndim, mode, cval, input.shape, wshape, origin)
-    return cupy.ElementwiseKernel(in_params, out_params, operation, name)(
+    weights = cupy.ascontiguousarray(weights, weights_dtype)
+    return _get_correlete_kernel(
+        input.ndim, mode, cval, input.shape, tuple(wshape), tuple(origin))(
         input, weights, output)
 
 
@@ -230,3 +229,13 @@ def _generate_correlete_kernel(ndim, mode, cval, xshape, wshape, origin):
         ndim, mode, '_'.join(['{}'.format(j) for j in xshape]),
         '_'.join(['{}'.format(j) for j in wshape]))
     return in_params, out_params, operation, name
+
+
+@util.memoize()
+def _get_correlete_kernel(ndim, mode, cval, xshape, wshape, origin):
+    # weights is always casted to float64 in order to get an output compatible
+    # with SciPy, thought float32 might be sufficient when input dtype is low
+    # precision.
+    in_params, out_params, operation, name = _generate_correlete_kernel(
+        ndim, mode, cval, xshape, wshape, origin)
+    return cupy.ElementwiseKernel(in_params, out_params, operation, name)
