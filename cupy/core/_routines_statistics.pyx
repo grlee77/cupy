@@ -1,5 +1,3 @@
-from cpython cimport sequence
-
 import numpy
 from numpy import nan
 
@@ -18,8 +16,8 @@ if cupy.cuda.cub_enabled:
 cdef ndarray _ndarray_max(ndarray self, axis, out, dtype, keepdims):
     if cupy.cuda.cub_enabled:
         # result will be None if the reduction is not compatible with CUB
-        result = cub_reduction(self, cub.CUPY_CUB_MAX, axis, dtype, out,
-                               keepdims)
+        result = cub.cub_reduction(self, cub.CUPY_CUB_MAX, axis, dtype, out,
+                                   keepdims)
         if result is not None:
             return result
     return _amax(self, axis=axis, out=out, dtype=dtype, keepdims=keepdims)
@@ -28,8 +26,8 @@ cdef ndarray _ndarray_max(ndarray self, axis, out, dtype, keepdims):
 cdef ndarray _ndarray_min(ndarray self, axis, out, dtype, keepdims):
     if cupy.cuda.cub_enabled:
         # result will be None if the reduction is not compatible with CUB
-        result = cub_reduction(self, cub.CUPY_CUB_MIN, axis, out, dtype,
-                               keepdims)
+        result = cub.cub_reduction(self, cub.CUPY_CUB_MIN, axis, out, dtype,
+                                   keepdims)
         if result is not None:
             return result
     return _amin(self, axis=axis, out=out, dtype=dtype, keepdims=keepdims)
@@ -39,8 +37,8 @@ cdef ndarray _ndarray_min(ndarray self, axis, out, dtype, keepdims):
 cdef ndarray _ndarray_argmax(ndarray self, axis, out, dtype, keepdims):
     if cupy.cuda.cub_enabled:
         # result will be None if the reduction is not compatible with CUB
-        result = cub_reduction(self, cub.CUPY_CUB_ARGMAX, axis, dtype, out,
-                               keepdims)
+        result = cub.cub_reduction(self, cub.CUPY_CUB_ARGMAX, axis, dtype, out,
+                                   keepdims)
         if result is not None:
             return result
     return _argmax(self, axis=axis, out=out, dtype=dtype, keepdims=keepdims)
@@ -50,8 +48,8 @@ cdef ndarray _ndarray_argmax(ndarray self, axis, out, dtype, keepdims):
 cdef ndarray _ndarray_argmin(ndarray self, axis, out, dtype, keepdims):
     if cupy.cuda.cub_enabled:
         # result will be None if the reduction is not compatible with CUB
-        result = cub_reduction(self, cub.CUPY_CUB_ARGMIN, axis, dtype, out,
-                               keepdims)
+        result = cub.cub_reduction(self, cub.CUPY_CUB_ARGMIN, axis, dtype, out,
+                                   keepdims)
         if result is not None:
             return result
     return _argmin(self, axis=axis, out=out, dtype=dtype, keepdims=keepdims)

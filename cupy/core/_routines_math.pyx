@@ -75,8 +75,8 @@ cdef ndarray _ndarray_prod(ndarray self, axis, dtype, out, keepdims):
 cdef ndarray _ndarray_sum(ndarray self, axis, dtype, out, keepdims):
     if cupy.cuda.cub_enabled:
         # result will be None if the reduction is not compatible with CUB
-        result = cub_reduction(self, cub.CUPY_CUB_SUM, axis, dtype, out,
-                               keepdims)
+        result = cub.cub_reduction(self, cub.CUPY_CUB_SUM, axis, dtype, out,
+                                   keepdims)
         if result is not None:
             return result
     if dtype is None:
