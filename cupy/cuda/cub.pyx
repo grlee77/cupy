@@ -201,7 +201,7 @@ def device_segmented_reduce(ndarray x, op, tuple reduce_axis, tuple out_axis,
 
     # prepare input
     contiguous_size = _preprocess_array(x, reduce_axis, out_axis, order)
-    out_shape = _get_output_shape(arr, out_axis, keepdims)
+    out_shape = _get_output_shape(x, out_axis, keepdims)
     x_ptr = <void*>x.data.ptr
     y = ndarray(out_shape, dtype=x.dtype, order=order)
     y_ptr = <void*>y.data.ptr
@@ -312,7 +312,8 @@ def can_use_device_segmented_reduce(int op, x_dtype, Py_ssize_t ndim,
                                     reduce_axis, dtype=None, order='C'):
     if not _cub_reduce_dtype_compatible(x_dtype, op, dtype):
         return False
-    return _cub_device_segmented_reduce_axis_compatible(reduce_axis, ndim, order)
+    return _cub_device_segmented_reduce_axis_compatible(reduce_axis, ndim,
+                                                        order)
 
 
 cdef _cub_reduce_dtype_compatible(x_dtype, int op, dtype=None,
