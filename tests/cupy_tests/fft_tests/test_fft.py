@@ -5,9 +5,9 @@ import pytest
 import numpy as np
 
 import cupy
+from cupy import testing
 from cupy.fft import config
 from cupy.fft.fft import _default_fft_func, _fft, _fftn
-from cupy import testing
 
 import six
 
@@ -195,7 +195,7 @@ class TestFftAllocate(unittest.TestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestFft2(unittest.TestCase):  # unittest.TestCase):
+class TestFft2(unittest.TestCase):
 
     @nd_planning_states()
     @testing.for_all_dtypes()

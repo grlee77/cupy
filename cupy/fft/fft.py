@@ -1,8 +1,6 @@
 from copy import copy
 from functools import reduce
 from math import sqrt
-from operator import mul
-from threading import get_ident
 
 import numpy as np
 import six
@@ -96,29 +94,6 @@ def _exec_fft(a, direction, value_type, norm, axis, overwrite_x,
         else:
             raise RuntimeError('Use the cuFFT plan either as a context manager'
                                ' or as an argument.')
-    elif cache.is_enabled():
-        # CUFFT plans can only be safely used by the thread that created them
-        thread_id = get_ident()
-
-        # Note: if user-defined stream supported is added to Plan1d in the
-        # future, the stream should be added to the key as well.
-        key = (out_size, fft_type, batch, thread_id)
-
-        try:
-            if key in cache._cufft_cache:
-                plan = cache._cufft_cache.lookup(key)
-            else:
-                plan = None
-
-        except KeyError:
-            # This occurs if the object has fallen out of the cache between
-            # the check and the lookup
-            plan = None
-
-        if plan is None:
-            plan = cufft.Plan1d(out_size, fft_type, batch)
-            cache._cufft_cache.insert(plan, key)
-
     if plan is None:
         plan = cufft.Plan1d(out_size, fft_type, batch)
     else:
@@ -360,39 +335,15 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
                 'GPU case (Can only batch FFT over the first or last '
                 'spatial axes).')
 
-    if cache.is_enabled():
-        # CUFFT plans can only be safely used by the thread that created them
-        thread_id = get_ident()
-
-        # Note: if user-defined stream supported is added to Plan1d in the
-        # future, the stream should be added to the key as well.
-        key = (shape, istride, ostride, inembed, onembed, idist, odist,
-               fft_type, nbatch, thread_id)
-
-        try:
-            if key in cache._cufft_cache:
-                plan = cache._cufft_cache.lookup(key)
-            else:
-                plan = None
-
-        except KeyError:
-            # This occurs if the object has fallen out of the cache between
-            # the check and the lookup
-            plan = None
-
-    if not cache.is_enabled() or plan is None:
-        plan = cufft.PlanNd(shape=plan_dimensions,
-                            istride=istride,
-                            ostride=ostride,
-                            inembed=inembed,
-                            onembed=onembed,
-                            idist=idist,
-                            odist=odist,
-                            fft_type=fft_type,
-                            batch=nbatch)
-        if cache.is_enabled():
-            cache._cufft_cache.insert(plan, key)
-
+    plan = cufft.PlanNd(shape=plan_dimensions,
+                        istride=istride,
+                        ostride=ostride,
+                        inembed=inembed,
+                        onembed=onembed,
+                        idist=idist,
+                        odist=odist,
+                        fft_type=fft_type,
+                        batch=nbatch)
     return plan
 
 
@@ -405,6 +356,7 @@ def _exec_fftn(a, direction, value_type, norm, axes, overwrite_x,
 
     if a.base is not None:
         a = a.copy()
+
     if a.flags.c_contiguous:
         order = 'C'
     elif a.flags.f_contiguous:
@@ -480,7 +432,6 @@ def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
         a = cupy.ascontiguousarray(a)
     elif order == 'F' and not a.flags.f_contiguous:
         a = cupy.asfortranarray(a)
-
     a = _exec_fftn(a, direction, value_type, norm=norm, axes=axes,
                    overwrite_x=overwrite_x, plan=plan, out=out)
     return a
@@ -594,7 +545,7 @@ def ifft2(a, s=None, axes=(-2, -1), norm=None):
     return func(a, s, axes, norm, cufft.CUFFT_INVERSE)
 
 
-def fftn(a, s=None, axes=None, norm=None, plan_type=None, plan=None, out=None):
+def fftn(a, s=None, axes=None, norm=None):
     """Compute the N-dimensional FFT.
 
     Args:
@@ -604,17 +555,6 @@ def fftn(a, s=None, axes=None, norm=None, plan_type=None, plan=None, out=None):
             axes specified by ``axes`` are used.
         axes (tuple of ints): Axes over which to compute the FFT.
         norm (None or ``"ortho"``): Keyword to specify the normalization mode.
-        plan_type (``"1d"`` or ``"nd"``): If ``"1d"`` perform separable 1D
-            planning. If ``"nd"`` use an n-dimensional plan. ``"nd"`` can
-            provide higher performance in some cases, but is limited to at most
-            3 contiguous axes and either the first or last axis must be
-            included in ``axes``.
-        plan (None or cufft.PlanNd): The CUFFT plan for use when plan_type
-            is ``"nd"``. If None, a new plan is created. This argument is
-            ignored when plan_type is ``"1d"``.
-        out (None or cupy.ndarray): The array to store the output. If None, a
-            new cupy.ndarray will be created. It is possible to also pass `a`
-            to `out` for an in-place transform.
 
     Returns:
         cupy.ndarray:
@@ -623,26 +563,11 @@ def fftn(a, s=None, axes=None, norm=None, plan_type=None, plan=None, out=None):
 
     .. seealso:: :func:`numpy.fft.fftn`
     """
-    if plan_type is None:
-        plan_type = _default_plan_type(a.ndim, s, axes)
-    if plan_type == 'nd':
-        return _fftn(a, s, axes, norm, cufft.CUFFT_FORWARD, plan=plan, out=out)
-    else:
-        if plan is not None:
-            raise ValueError(
-                "User-provided plan only supported when plan_type is 'nd'.")
-        if out is not None:
-            raise ValueError(
-                "Preallocated out only supported when plan_type is 'nd'")
-        return _fft(a, s, axes, norm, cufft.CUFFT_FORWARD)
-
-# TODO: remove plan_type, plan and out arguments and just use?:
-#    func = _default_fft_func(a, s, axes)
-#    return func(a, s, axes, norm, cufft.CUFFT_FORWARD)
+    func = _default_fft_func(a, s, axes)
+    return func(a, s, axes, norm, cufft.CUFFT_FORWARD)
 
 
-def ifftn(a, s=None, axes=None, norm=None, plan_type=None, plan=None,
-          out=None):
+def ifftn(a, s=None, axes=None, norm=None):
     """Compute the N-dimensional inverse FFT.
 
     Args:
@@ -652,17 +577,6 @@ def ifftn(a, s=None, axes=None, norm=None, plan_type=None, plan=None,
             axes specified by ``axes`` are used.
         axes (tuple of ints): Axes over which to compute the FFT.
         norm (None or ``"ortho"``): Keyword to specify the normalization mode.
-        plan_type (``"1d"`` or ``"nd"``): If ``"1d"`` perform separable 1D
-            planning. If ``"nd"`` use an n-dimensional plan. ``"nd"`` can
-            provide higher performance in some cases, but is limited to at most
-            3 contiguous axes and either the first or last axis must be
-            included in ``axes``.
-        plan (None or cufft.PlanNd): The CUFFT plan for use when plan_type
-            is ``"nd"``. If None, a new plan is created. This argument is
-            ignored when plan_type is ``"1d"``.
-        out (None or cupy.ndarray): The array to store the output. If None, a
-            new cupy.ndarray will be created. It is possible to also pass `a`
-            to `out` for an in-place transform.
 
     Returns:
         cupy.ndarray:
@@ -671,22 +585,8 @@ def ifftn(a, s=None, axes=None, norm=None, plan_type=None, plan=None,
 
     .. seealso:: :func:`numpy.fft.ifftn`
     """
-    if plan_type is None:
-        plan_type = _default_plan_type(a.ndim, s, axes)
-    if plan_type == 'nd':
-        return _fftn(a, s, axes, norm, cufft.CUFFT_INVERSE, plan=plan, out=out)
-    else:
-        if plan is not None:
-            raise ValueError("User-provided plan only supported when "
-                             "plan_type is 'nd'.")
-        if out is not None:
-            raise ValueError(
-                "Preallocated out only supported when plan_type is 'nd'")
-        return _fft(a, s, axes, norm, cufft.CUFFT_INVERSE)
-
-# TODO: remove plan_type, plan and out arguments and just use?:
-#    func = _default_fft_func(a, s, axes)
-#    return func(a, s, axes, norm, cufft.CUFFT_INVERSE)
+    func = _default_fft_func(a, s, axes)
+    return func(a, s, axes, norm, cufft.CUFFT_INVERSE)
 
 
 def rfft(a, n=None, axis=-1, norm=None):
