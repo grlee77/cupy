@@ -5,10 +5,8 @@ import pytest
 import numpy as np
 
 import cupy
-from cupy.fft import cache
 from cupy.fft import config
-from cupy.fft.fft import _default_plan_type, _get_cufft_plan_nd
-
+from cupy.fft.fft import _default_fft_func, _fft, _fftn
 from cupy import testing
 
 import six
@@ -52,17 +50,6 @@ def nd_planning_states(states=[True, False], name='enable_nd'):
     return decorator
 
 
-class CachedTestCase(unittest.TestCase):
-    """Enable caching of CUFFT plans during the test."""
-
-    def setUp(self):
-        cache.enable()
-        cache.set_keepalive_time(1.0)  # retain items in cache for 5 seconds
-
-    def tearDown(self):
-        cache.disable()
-
-
 @testing.parameterize(*testing.product({
     'n': [None, 0, 5, 10, 15],
     'shape': [(10,), (10, 10)],
@@ -70,7 +57,7 @@ class CachedTestCase(unittest.TestCase):
 }))
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestFft(CachedTestCase):
+class TestFft(unittest.TestCase):
 
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
@@ -141,42 +128,32 @@ class TestFftOrder(unittest.TestCase):
 
 
 @testing.gpu
-class TestFftCacheEnableDisable(CachedTestCase):
-
-    def test_cache_is_enabled(self):
-        assert cache.is_enabled()
-
-        cache.disable()
-        assert not cache.is_enabled()
-
-
-@testing.gpu
 class TestDefaultPlanType(unittest.TestCase):
 
     @nd_planning_states()
-    def test_default_plan_type(self, enable_nd):
+    def test_default_fft_func(self, enable_nd):
         # test cases where nd CUFFT plan is possible
         ca = cupy.ones((16, 16, 16))
         for axes in [(0, 1), (1, 2), None, (0, 1, 2)]:
-            plan_type = _default_plan_type(ca.ndim, axes=axes)
+            fft_func = _default_fft_func(ca, axes=axes)
             if enable_nd:
-                self.assertEqual(plan_type, 'nd')
+                assert fft_func is _fftn
             else:
-                self.assertEqual(plan_type, '1d')
+                assert fft_func is _fft
 
         # only a single axis is transformed -> 1d plan preferred
         for axes in [(0, ), (1, ), (2, )]:
-            self.assertEqual(_default_plan_type(ca.ndim, axes=axes), '1d')
+            assert _default_fft_func(ca, axes=axes) is _fft
 
         # non-contiguous axes -> nd plan not possible
-        self.assertEqual(_default_plan_type(ca.ndim, axes=(0, 2)), '1d')
+        assert _default_fft_func(ca, axes=(0, 2)) is _fft
 
         # >3 axes transformed -> nd plan not possible
         ca = cupy.ones((2, 4, 6, 8))
-        self.assertEqual(_default_plan_type(ca.ndim), '1d')
+        assert _default_fft_func(ca) is _fft
 
         # first or last axis not included -> nd plan not possible
-        self.assertEqual(_default_plan_type(ca.ndim, axes=(1, )), '1d')
+        assert _default_fft_func(ca, axes=(1, )) is _fft
 
 
 @testing.gpu
@@ -218,7 +195,7 @@ class TestFftAllocate(unittest.TestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestFft2(CachedTestCase):  # unittest.TestCase):
+class TestFft2(unittest.TestCase):  # unittest.TestCase):
 
     @nd_planning_states()
     @testing.for_all_dtypes()
@@ -271,7 +248,7 @@ class TestFft2(CachedTestCase):  # unittest.TestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestFftn(CachedTestCase):
+class TestFftn(unittest.TestCase):
 
     @nd_planning_states()
     @testing.for_all_dtypes()
@@ -477,7 +454,7 @@ class TestPlanCtxManagerFft(unittest.TestCase):
     {'shape': (2, 3, 4, 5), 's': None, 'axes': (-3, -2, -1), 'norm': None},
 )
 @testing.gpu
-class TestFftnContiguity(unittest.TestCase):  # use CachedTestCase?
+class TestFftnContiguity(unittest.TestCase):
 
     @nd_planning_states([True])
     @testing.for_all_dtypes()
@@ -488,8 +465,8 @@ class TestFftnContiguity(unittest.TestCase):  # use CachedTestCase?
                 a = cupy.asfortranarray(a)
             out = cupy.fft.fftn(a, s=self.s, axes=self.axes)
 
-            plan_type = _default_plan_type(a.ndim, s=self.s, axes=self.axes)
-            if plan_type == 'nd':
+            fft_func = _default_fft_func(a, s=self.s, axes=self.axes)
+            if fft_func is _fftn:
                 # nd plans have output with contiguity matching the input
                 self.assertEqual(out.flags.c_contiguous, a.flags.c_contiguous)
                 self.assertEqual(out.flags.f_contiguous, a.flags.f_contiguous)
@@ -507,8 +484,8 @@ class TestFftnContiguity(unittest.TestCase):  # use CachedTestCase?
                 a = cupy.asfortranarray(a)
             out = cupy.fft.ifftn(a, s=self.s, axes=self.axes)
 
-            plan_type = _default_plan_type(a.ndim, s=self.s, axes=self.axes)
-            if plan_type == 'nd':
+            fft_func = _default_fft_func(a, s=self.s, axes=self.axes)
+            if fft_func is _fftn:
                 # nd plans have output with contiguity matching the input
                 self.assertEqual(out.flags.c_contiguous, a.flags.c_contiguous)
                 self.assertEqual(out.flags.f_contiguous, a.flags.f_contiguous)
@@ -524,7 +501,7 @@ class TestFftnContiguity(unittest.TestCase):  # use CachedTestCase?
 }))
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestRfft(CachedTestCase):
+class TestRfft(unittest.TestCase):
 
     @testing.for_all_dtypes(no_complex=True)
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, contiguous_check=False)
@@ -574,7 +551,7 @@ class TestRfft(CachedTestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestRfft2(CachedTestCase):
+class TestRfft2(unittest.TestCase):
 
     @testing.for_all_dtypes(no_complex=True)
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
@@ -624,7 +601,7 @@ class TestRfft2(CachedTestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestRfftn(CachedTestCase):
+class TestRfftn(unittest.TestCase):
 
     @testing.for_all_dtypes(no_complex=True)
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, accept_error=ValueError,
@@ -658,7 +635,7 @@ class TestRfftn(CachedTestCase):
 }))
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestHfft(CachedTestCase):
+class TestHfft(unittest.TestCase):
 
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, contiguous_check=False)
@@ -690,7 +667,7 @@ class TestHfft(CachedTestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestFftfreq(CachedTestCase):
+class TestFftfreq(unittest.TestCase):
 
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, contiguous_check=False)
@@ -718,7 +695,7 @@ class TestFftfreq(CachedTestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.10.0')
-class TestFftshift(CachedTestCase):
+class TestFftshift(unittest.TestCase):
 
     @testing.for_all_dtypes()
     @testing.numpy_cupy_allclose(rtol=1e-4, atol=1e-7, contiguous_check=False)
