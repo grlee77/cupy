@@ -239,7 +239,8 @@ def device_segmented_reduce(ndarray x, op, tuple reduce_axis, tuple out_axis,
 
 def device_csrmv(int n_rows, int n_cols, int nnz, ndarray values,
                  ndarray indptr, ndarray indices, ndarray x):
-    cdef ndarray y, ws
+    cdef ndarray y
+    cdef memory.MemoryPointer ws
     cdef void* values_ptr
     cdef void* row_offsets_ptr
     cdef void* col_indices_ptr
@@ -281,8 +282,8 @@ def device_csrmv(int n_rows, int n_cols, int nnz, ndarray values,
     ws_size = cub_device_spmv_get_workspace_size(
         values_ptr, row_offsets_ptr, col_indices_ptr, x_ptr, y_ptr, n_rows,
         n_cols, nnz, s, dtype_id)
-    ws = ndarray(ws_size, numpy.int8)
-    ws_ptr = <void*>ws.data.ptr
+    ws = memory.alloc(ws_size)
+    ws_ptr = <void *>ws.ptr
     cub_device_spmv(ws_ptr, ws_size, values_ptr, row_offsets_ptr,
                     col_indices_ptr, x_ptr, y_ptr, n_rows, n_cols, nnz, s,
                     dtype_id)
