@@ -253,7 +253,6 @@ def device_csrmv(int n_rows, int n_cols, int nnz, ndarray values,
 
     if x.ndim != 1:
         raise ValueError('array must be 1d')
-    # x must have shape and dtype matching the CSR matrix
     if x.size != n_cols:
         raise ValueError("size of array does not match the CSR matrix")
 

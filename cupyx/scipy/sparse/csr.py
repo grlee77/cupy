@@ -10,6 +10,8 @@ from cupy.cuda.cub import device_csrmv
 from cupyx.scipy.sparse import base
 from cupyx.scipy.sparse import compressed
 from cupyx.scipy.sparse import csc
+if cupy.cuda.cub_enabled:
+    from cupy.cuda.cub import device_csrmv
 
 
 class csr_matrix(compressed._compressed_sparse_matrix):
