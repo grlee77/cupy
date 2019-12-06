@@ -197,12 +197,12 @@ def _prep_fftn_axes(ndim, s=None, axes=None):
         else:
             dim = len(s)
         axes = tuple([i + ndim for i in six.moves.range(-dim, 0)])
+        axes_sorted = axes
     else:
         axes = tuple(axes)
         if reduce(min, axes) < -ndim or reduce(max, axes) > ndim - 1:
             raise ValueError("The specified axes exceed the array dimensions.")
-
-    axes_sorted = tuple(sorted([ax % ndim for ax in axes]))
+        axes_sorted = tuple(sorted([ax % ndim for ax in axes]))
 
     # PlanNd supports 1D, 2D and 3D batch transforms over contiguous axes
     if (len(axes) > 3 or
@@ -247,7 +247,8 @@ def _get_cufft_plan_nd(shape, fft_type, axes=None, order='C'):
         # transform over all axes
         fft_axes = tuple(range(ndim))
     else:
-        _, fft_axes, nd_plan_possible = _prep_fftn_axes(ndim, s=None, axes=axes)
+        _, fft_axes, nd_plan_possible = _prep_fftn_axes(ndim, s=None,
+                                                        axes=axes)
 
     if len(fft_axes) < 1 or len(fft_axes) > 3:
         raise ValueError(
@@ -431,7 +432,6 @@ def _fftn(a, s, axes, norm, direction, value_type='C2C', order='A', plan=None,
     # Note: need to call_cook_shape prior to sorting the axes
     a = _cook_shape(a, s, axes, value_type, order=order)
 
-    axes = axes_sorted
     if order == 'C' and not a.flags.c_contiguous:
         a = cupy.ascontiguousarray(a)
     elif order == 'F' and not a.flags.f_contiguous:
