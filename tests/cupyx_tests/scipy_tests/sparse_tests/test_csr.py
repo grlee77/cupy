@@ -1128,9 +1128,7 @@ class TestCsrMatrixGetitem(unittest.TestCase):
     @testing.with_requires('scipy>=1.4')
     @testing.numpy_cupy_allclose(sp_name='sp')
     def test_getitem_slice_start_larger_than_stop2(self, xp, sp):
-        m_sl = _make(xp, sp, self.dtype)[3:2]
-        assert m_sl.size == 0
-        assert m_sl.dtype == self.dtype
+        return _make(xp, sp, self.dtype)[3:2]
 
     def test_getitem_slice_step_2(self):
         with self.assertRaises(ValueError):

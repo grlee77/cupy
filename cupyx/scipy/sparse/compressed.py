@@ -285,12 +285,8 @@ class _compressed_sparse_matrix(sparse_data._data_matrix):
             raise ValueError('slicing with step != 1 not supported')
 
         if not (major_start <= major_stop):
-            # SciPy >= 1.4.0 return an empty sparse matrix
-            return self.__class__((cupy.empty(0, self.dtype),
-                                   cupy.empty(0, 'i'),
-                                   cupy.empty((1,), 'i')),
-                                  shape=(0, 0),
-                                  dtype=self.dtype)
+            # will give an empty slice, but preserve shape on the other axis
+            major_start = major_stop
 
         start = self.indptr[major_start]
         stop = self.indptr[major_stop]
