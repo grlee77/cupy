@@ -5,7 +5,7 @@ from cupy import util
 
 
 def correlate(input, weights, output=None, mode='reflect', cval=0.0, origin=0,
-              single_precision=False):
+              *, single_precision=False):
     """Multi-dimensional correlate.
 
     The array is correlated with the given kernel.
@@ -38,7 +38,7 @@ def correlate(input, weights, output=None, mode='reflect', cval=0.0, origin=0,
 
 
 def convolve(input, weights, output=None, mode='reflect', cval=0.0, origin=0,
-             single_precision=False):
+             *, single_precision=False):
     """Multi-dimensional convolution.
 
     The array is convolved with the given kernel.
