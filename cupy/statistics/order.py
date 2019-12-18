@@ -149,7 +149,7 @@ def ptp(a, axis=None, out=None, keepdims=False):
 
     Args:
         a (cupy.ndarray): Array over which to take the range.
-        axis (int): The axis along which to take the minimum. The flattened
+        axis (int): Axis along which to take the minimum. The flattened
             array is used by default.
         out (cupy.ndarray): Output array.
         keepdims (bool): If ``True``, the axis is retained as an axis of
