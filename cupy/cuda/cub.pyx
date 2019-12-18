@@ -66,7 +66,8 @@ cdef extern from 'cupy_cub.h' nogil:
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cpdef bint _contig_axes(tuple axes):
-    cdef size_t n
+    # True if the specified axes are in ascending order without gaps
+    cdef Py_ssize_t n
     cdef bint contig = True
     for n in range(1, len(axes)):
         contig = (axes[n] - axes[n - 1]) == 1
@@ -354,7 +355,7 @@ def cub_reduction(arr, op, axis=None, dtype=None, out=None, keepdims=False):
     if op > CUPY_CUB_MAX:
         # For argmin and argmax, NumPy does not allow a tuple for axis.
         # Also, the keepdims and dtype kwargs are not provided.
-
+        #
         # For now we don't enforce these for consistency with existing CuPy
         # non-CUB reduction behavior.
         # https://github.com/cupy/cupy/issues/2595
