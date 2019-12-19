@@ -59,7 +59,8 @@ class TestMapCoordinates(unittest.TestCase):
     @testing.numpy_cupy_allclose(atol=1e-5, scipy_name='scp')
     def test_map_coordinates_float_nd_coords(self, xp, scp, dtype):
         a = testing.shaped_random((100, 100), xp, dtype)
-        coordinates = testing.shaped_random((a.ndim, ) + a.shape, xp, dtype)
+        coordinates = testing.shaped_random((a.ndim, 10, 10), xp, dtype,
+                                            scale=99.0)
         return self._map_coordinates(xp, scp, a, coordinates)
 
     @testing.for_int_dtypes(no_bool=True)
