@@ -1,6 +1,7 @@
 import numpy
 
 import cupy
+from cupy import util
 
 
 def correlate(input, weights, output=None, mode='reflect', cval=0.0, origin=0,
@@ -141,13 +142,16 @@ def _correlate_or_convolve(input, weights, output, mode, cval, origin,
     input = cupy.ascontiguousarray(input)
     weights = cupy.ascontiguousarray(weights, weights_dtype)
 
-    # kernel needs only the non-zero kernel values and their coordinates
+    # The kernel needs only the non-zero kernel values and their coordinates.
+    # This allows us to use a single for loop to compute the ndim convolution.
+    # The loop will be over only the the non-zero entries of the filter.
     wlocs = cupy.where(weights)
-    wvals = weights[wlocs]
-    wlocs = cupy.concatenate(wlocs)
+    wvals = weights[wlocs]     # (nnz,) array of non-zero values
+    wlocs = cupy.stack(wlocs)  # (ndim, nnz) array of indices for these values
+
     return _get_correlete_kernel(
-        input.ndim, mode, cval, input.shape, weights, tuple(origin))(
-        input, wlocs, wvals, output)
+        input.ndim, mode, cval, input.shape, weights.shape, wvals.size,
+        tuple(origin))(input, wlocs, wvals, output)
 
 
 def _generate_boundary_condition_ops(mode, ix, xsize):
@@ -186,20 +190,11 @@ def _generate_boundary_condition_ops(mode, ix, xsize):
     return ops
 
 
-def _generate_correlete_kernel(mode, cval, xshape, w, origin):
+def _generate_correlete_kernel(mode, cval, xshape, wshape, nnz, origin):
     in_params = "raw X x, raw I wlocs, raw W wvals"
     out_params = "Y y"
 
-    ndim = w.ndim
-    wshape = w.shape
-
-    # extract the non-zero filter coefficient indices and values
-    # This allows us to use a single for loop to compute the nd convolution.
-    # The loop will be over only the the non-zero entries of the filter.
-    w = w.get()
-    wlocs = numpy.where(w)
-    wvals = w[wlocs]            # (nnz,) array of non-zero values
-    wlocs = numpy.stack(wlocs)  # (ndim, nnz) array of indices for these values
+    ndim = len(wshape)
 
     ops = []
     ops.append("const int sx_{} = 1;".format(ndim - 1))
@@ -223,14 +218,14 @@ def _generate_correlete_kernel(mode, cval, xshape, w, origin):
         """
         for (int iw = 0; iw < {nnz}; iw++)
         {{
-        """.format(nnz=wvals.size)
+        """.format(nnz=nnz)
     )
     for j in range(ndim):
         ops.append(
             """
                 //iloc += {nnz};
                 int iw_{j} = wlocs[iw + {j} * {nnz}];
-                int ix_{j} = cx_{j} + iw_{j};""".format(j=j, nnz=wvals.size)
+                int ix_{j} = cx_{j} + iw_{j};""".format(j=j, nnz=nnz)
         )
         ixvar = "ix_{}".format(j)
         ops.append(_generate_boundary_condition_ops(mode, ixvar, xshape[j]))
@@ -254,19 +249,21 @@ def _generate_correlete_kernel(mode, cval, xshape, w, origin):
     ops.append("y = (Y)sum;")
     operation = "\n".join(ops)
 
-    name = "cupy_ndimage_correlate_{}d_{}_x{}_w{}_masked".format(
+    name = "cupy_ndimage_correlate_{}d_{}_x{}_w{}_nnz{}".format(
         ndim,
         mode,
         "_".join(["{}".format(j) for j in xshape]),
         "_".join(["{}".format(j) for j in wshape]),
+        nnz,
     )
     return in_params, out_params, operation, name
 
 
-def _get_correlete_kernel(ndim, mode, cval, xshape, w, origin):
+@util.memoize()
+def _get_correlete_kernel(ndim, mode, cval, xshape, wshape, nnz, origin):
     # weights is always casted to float64 in order to get an output compatible
     # with SciPy, thought float32 might be sufficient when input dtype is low
     # precision.
     in_params, out_params, operation, name = _generate_correlete_kernel(
-        mode, cval, xshape, w, origin)
+        mode, cval, xshape, wshape, nnz, origin)
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
