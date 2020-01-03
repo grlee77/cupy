@@ -82,7 +82,14 @@ cdef ndarray _ndarray_mean(ndarray self, axis, dtype, out, keepdims):
             if dtype is not None:
                 result = result.astype(dtype, copy=False)
             return result
-    return _mean(self, axis=axis, dtype=dtype, out=out, keepdims=keepdims)
+    dtype_out = None
+    if dtype is not None and numpy.dtype(dtype).kind not in ['c', 'f']:
+        dtype_out = dtype
+        dtype = numpy.promote_types(dtype, numpy.float32)
+    out = _mean(self, axis=axis, dtype=dtype, out=out, keepdims=keepdims)
+    if dtype_out is not None:
+        out = out.astype(dtype_out)
+    return out
 
 
 cdef ndarray _ndarray_var(ndarray self, axis, dtype, out, ddof, keepdims):
