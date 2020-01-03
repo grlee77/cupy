@@ -75,7 +75,10 @@ cdef ndarray _ndarray_mean(ndarray self, axis, dtype, out, keepdims):
         result = cub.cub_reduction(self, cub.CUPY_CUB_SUM, axis, dtype, out,
                                    keepdims)
         if result is not None:
-            result /= (self.size / result.size)
+            if result.real.dtype.kind == 'f':
+                result /= (self.size / result.size)
+            else:
+                result = result / (self.size / result.size)
             return result
     return _mean(self, axis=axis, dtype=dtype, out=out, keepdims=keepdims)
 
