@@ -63,6 +63,8 @@ cdef ndarray _ndarray_mean(ndarray self, axis, dtype, out, keepdims):
                 result /= (self.size / result.size)
             else:
                 result = result / (self.size / result.size)
+            if dtype is not None:
+                result = result.astype(dtype, copy=False)
             return result
     return _mean(self, axis=axis, dtype=dtype, out=out, keepdims=keepdims)
 
