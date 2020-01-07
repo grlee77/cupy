@@ -6,6 +6,7 @@ from cpython cimport sequence
 
 import numpy
 
+from cupy.core._errors import _AxisError
 from cupy.core.core cimport ndarray, _internal_ascontiguousarray
 from cupy.core.core cimport _internal_asfortranarray
 from cupy.core.internal cimport _contig_axes
@@ -53,12 +54,15 @@ cdef extern from 'cupy_cub.h' nogil:
                                      void*, Stream_t, int, int)
     void cub_device_spmv(void*, size_t&, void*, void*, void*, void*, void*,
                          int, int, int, Stream_t, int)
+    void cub_device_scan(void*, size_t&, void*, void*, int, Stream_t, int, int)
     size_t cub_device_reduce_get_workspace_size(void*, void*, int, Stream_t,
                                                 int, int)
     size_t cub_device_segmented_reduce_get_workspace_size(
         void*, void*, int, void*, void*, Stream_t, int, int)
     size_t cub_device_spmv_get_workspace_size(
         void*, void*, void*, void*, void*, int, int, int, Stream_t, int)
+    size_t cub_device_scan_get_workspace_size(
+        void*, void*, int, Stream_t, int, int)
 
 ###############################################################################
 # Python interface
@@ -284,6 +288,65 @@ def device_csrmv(int n_rows, int n_cols, int nnz, ndarray values,
     return y
 
 
+def device_scan(ndarray x, int op, dtype=None, ndarray out=None):
+    cdef ndarray y
+    cdef memory.MemoryPointer ws
+    cdef int dtype_id, x_size
+    cdef size_t ws_size
+    cdef void *x_ptr
+    cdef void *y_ptr
+    cdef void *ws_ptr
+    cdef Stream_t s
+
+    if out is not None and out.shape != x.shape:
+        raise ValueError('shape mismatch')
+    if op != CUPY_CUB_CUMSUM and op != CUPY_CUB_CUMPROD:
+        raise ValueError('only CUPY_CUB_CUMSUM and CUPY_CUB_CUMPROD '
+                         'are supported.')
+
+    x_dtype = x.dtype
+    if dtype is None:
+        dtype = x_dtype
+    # TODO(leofang): how to determine system's default integer type?
+    if dtype in (numpy.int8, numpy.int16, numpy.int32):
+        dtype = numpy.int64
+    elif dtype in (numpy.uint8, numpy.uint16, numpy.uint32):
+        dtype = numpy.uint64
+    else:
+        dtype = x_dtype
+    x = x.astype(dtype)
+    if out is not None:
+        y = out.astype(dtype)
+    else:
+        y = ndarray(x.shape, dtype)
+
+    if x.size == 0:
+        if out is not None:
+            out = out.reshape((0,))
+            y = out
+        else:
+            y = ndarray((0,), dtype=dtype)
+        return y
+
+    x = _internal_ascontiguousarray(x)
+    x_ptr = <void *>x.data.ptr
+    x_size = <int>x.size
+    y_ptr = <void *>y.data.ptr
+    s = <Stream_t>stream.get_current_stream_ptr()
+    dtype_id = _get_dtype_id(dtype)
+    ws_size = cub_device_scan_get_workspace_size(x_ptr, y_ptr, x_size, s,
+                                                 op, dtype_id)
+    ws = memory.alloc(ws_size)
+    ws_ptr = <void *>ws.ptr
+    with nogil:
+        cub_device_scan(ws_ptr, ws_size, x_ptr, y_ptr, x_size, s, op, dtype_id)
+
+    if out is not None:
+        out[...] = y
+        y = out
+    return y
+
+
 cdef bint _cub_device_segmented_reduce_axis_compatible(
         tuple cub_axis, Py_ssize_t ndim, order):
     # Implementation borrowed from cupy.fft.fft._get_cufft_plan_nd().
@@ -341,7 +404,7 @@ def cub_reduction(arr, op, axis=None, dtype=None, out=None, keepdims=False):
     from cupy.core._reduction import _get_axis
     cdef bint enforce_numpy_API = False
 
-    if op > CUPY_CUB_MAX:
+    if op == CUPY_CUB_ARGMIN or op == CUPY_CUB_ARGMAX:
         # For argmin and argmax, NumPy does not allow a tuple for axis.
         # Also, the keepdims and dtype kwargs are not provided.
         #
@@ -371,7 +434,7 @@ def cub_reduction(arr, op, axis=None, dtype=None, out=None, keepdims=False):
     if can_use_device_reduce(op, arr.dtype, out_axis, dtype):
         return device_reduce(arr, op, out_axis, out, keepdims)
 
-    if op > CUPY_CUB_MAX:
+    if op == CUPY_CUB_ARGMIN or op == CUPY_CUB_ARGMAX:
         # segmented reduction not currently implemented for argmax, argmin
         return None
 
@@ -386,6 +449,35 @@ def cub_reduction(arr, op, axis=None, dtype=None, out=None, keepdims=False):
                                        reduce_axis, dtype, order):
         return device_segmented_reduce(arr, op, reduce_axis, out_axis,
                                        out, keepdims)
+    return None
+
+
+def can_use_device_scan(x_dtype, dtype=None):
+    if dtype is not None:
+        return (dtype in CUB_support_dtype)
+    return (x_dtype in CUB_support_dtype)
+
+
+def cub_scan(arr, op, axis=None, dtype=None, out=None):
+    """Perform a prefix scan using CUB.
+
+    If the specified scan is not possible, None is returned.
+    """
+    if axis is not None:
+        if sequence.PySequence_Check(axis):
+            raise TypeError(
+                "'tuple' object cannot be interpreted as an integer")
+        if not (-arr.ndim <= axis < arr.ndim):
+            raise _AxisError('axis(={}) out of bounds'.format(axis))
+        if arr.ndim != 1 or axis != 0:
+            return None
+
+    if op < CUPY_CUB_CUMSUM or op > CUPY_CUB_CUMPROD:
+        return None
+
+    if can_use_device_scan(arr.dtype, dtype):
+        return device_scan(arr, op, dtype, out)
+
     return None
 
 
