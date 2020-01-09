@@ -85,6 +85,21 @@ __global__ void test_multiply(const TYPE* x1, const TYPE* x2, TYPE* y, \
 }
 '''
 
+test_const_mem = r'''
+extern "C"{
+__constant__ float some_array[100];
+
+__global__ void multiply_by_const(float* x, int N) {
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (id < N) {
+        x[id] *= some_array[id];
+    }
+}
+
+}
+'''
+
 # dynamic parallelism
 _test_source4 = r'''
 extern "C"{
@@ -386,6 +401,17 @@ class TestRaw(unittest.TestCase):
         with pytest.raises(cupy.cuda.driver.CUDADriverError) as ex:
             self.mod2.get_function('no_such_kernel')
         assert 'CUDA_ERROR_NOT_FOUND' in str(ex.value)
+
+    def test_const_memory(self):
+        mod = cupy.RawModule(test_const_mem, backend=self.backend)
+        ker = mod.get_function('multiply_by_const')
+        mem_ptr = mod.get_global('some_array')
+        const_arr = cupy.ndarray((100,), cupy.float32, mem_ptr)
+        data = cupy.arange(100, dtype=cupy.float32)
+        const_arr[...] = data
+        output_arr = cupy.ones(100, dtype=cupy.float32)
+        ker((1,), (100,), (output_arr, cupy.int32(100)))
+        assert (data == output_arr).all()
 
     def test_dynamical_parallelism(self):
         ker = cupy.RawKernel(_test_source4, 'test_kernel', options=('-dc',),
