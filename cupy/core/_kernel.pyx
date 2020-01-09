@@ -84,13 +84,19 @@ cdef list _preprocess_args(int dev_id, args, bint use_c_scalar):
     """Preprocesses arguments for kernel invocation
 
     - Checks device compatibility for ndarrays
-    - Converts Python scalars into NumPy scalars
+    - Converts Python/NumPy scalars:
+      - If use_c_scalar is True, into CScalars.
+      - If use_c_scalar is False, into NumPy scalars.
     """
     cdef list ret = []
 
     for arg in args:
         if type(arg) is not ndarray:
-            s = _scalar.convert_scalar(arg, use_c_scalar)
+            if use_c_scalar:
+                s = _scalar.scalar_to_c_scalar(arg)
+            else:
+                s = _scalar.scalar_to_numpy_scalar(arg)
+
             if s is not None:
                 ret.append(s)
                 continue
@@ -341,34 +347,40 @@ cdef tuple _decide_params_type_core(
 
 
 cdef tuple _broadcast(list args, tuple params, bint use_size):
-    cpdef Py_ssize_t i
-    cpdef ParameterInfo p
-    cpdef bint is_none, is_not_none
+    cdef Py_ssize_t i
+    cdef ParameterInfo p
+    cdef bint any_nonraw_array = False
     cdef vector.vector[Py_ssize_t] shape
+
+    # Collect non-raw arrays
     value = []
-    is_none = False
-    is_not_none = False
     for i in range(len(args)):
         p = params[i]
         a = args[i]
         if not p.raw and isinstance(a, ndarray):
-            is_not_none = True
+            # Non-raw array
+            any_nonraw_array = True
             value.append(a)
         else:
-            is_none = True
             value.append(None)
 
     if use_size:
-        if not is_none:
+        if any_nonraw_array:
             raise ValueError('Specified \'size\' can be used only '
                              'if all of the ndarray are \'raw\'.')
     else:
-        if not is_not_none:
-            raise ValueError('Loop size is Undecided')
+        if not any_nonraw_array:
+            raise ValueError('Loop size is undecided.')
+
+    # Perform broadcast.
+    # Note that arrays in `value` are replaced with broadcasted ones.
     internal._broadcast_core(value, shape)
+
+    # Restore raw arrays and scalars from the original list.
     for i, a in enumerate(value):
         if a is None:
             value[i] = args[i]
+
     return value, tuple(shape)
 
 
@@ -445,9 +457,10 @@ cdef list _get_out_args_with_params(
     return out_args
 
 
-cdef function.Function _get_elementwise_kernel(
+@util.memoize(for_each_device=True)
+def _get_elementwise_kernel(
         tuple args_info, tuple types, tuple params, operation, name,
-        preamble, dict kwargs):
+        preamble, **kwargs):
     kernel_params = _get_kernel_params(params, args_info)
     types_preamble = '\n'.join(
         'typedef %s %s;' % (_get_typename(v), k) for k, v in types)
@@ -466,9 +479,6 @@ cdef function.Function _get_elementwise_kernel(
     return _get_simple_elementwise_kernel(
         kernel_params, operation, name,
         preamble, **kwargs)
-
-
-cdef dict _elementwise_kernel_memo = {}
 
 
 cdef class ElementwiseKernel:
@@ -526,6 +536,7 @@ cdef class ElementwiseKernel:
         readonly bint return_tuple
         readonly dict kwargs
         readonly dict _params_type_memo
+        readonly dict _elementwise_kernel_memo
 
     def __init__(self, in_params, out_params, operation,
                  name='kernel', reduce_dims=True, preamble='',
@@ -552,6 +563,7 @@ cdef class ElementwiseKernel:
         names = [p.name for p in self.in_params + self.out_params]
         if 'i' in names:
             raise ValueError('Can not use \'i\' as a parameter name')
+        self._elementwise_kernel_memo = {}
 
     def __call__(self, *args, **kwargs):
         """Compiles and invokes the elementwise kernel.
@@ -568,6 +580,8 @@ cdef class ElementwiseKernel:
                 This parameter must be specified if and only if all ndarrays
                 are `raw` and the range size cannot be determined
                 automatically.
+            block_size (int): Number of threads per block. By default, the
+                value is set to 128.
 
         Returns:
             If ``no_return`` has not set, arrays are returned according to the
@@ -583,9 +597,11 @@ cdef class ElementwiseKernel:
         size = -1
         size = kwargs.pop('size', -1)
         stream = kwargs.pop('stream', None)
+        block_size = kwargs.pop('block_size', 128)
         if len(kwargs):
             raise TypeError('Wrong arguments %s' % kwargs)
-
+        if block_size <= 0:
+            raise ValueError('block_size must be greater than zero')
         n_args = len(args)
         if n_args != self.nin and n_args != self.nargs:
             raise TypeError('Wrong number of arguments for %s' % self.name)
@@ -635,7 +651,7 @@ cdef class ElementwiseKernel:
         args_info = _get_args_info(inout_args)
         kern = self._get_elementwise_kernel(dev_id, args_info, types)
         kern.linear_launch(indexer.size, inout_args, shared_mem=0,
-                           block_max_size=128, stream=stream)
+                           block_max_size=block_size, stream=stream)
         return ret
 
     cpdef tuple _decide_params_type(
@@ -652,25 +668,20 @@ cdef class ElementwiseKernel:
     cpdef function.Function _get_elementwise_kernel(
             self, int dev_id, tuple args_info, tuple types):
         key = (
-            self.params,
-            self.operation,
-            self.name,
-            self.preamble,
-            tuple(sorted(self.kwargs.items())),
             dev_id,
             args_info,
             types)
-        kern = _elementwise_kernel_memo.get(key, None)
+        kern = self._elementwise_kernel_memo.get(key, None)
         if kern is not None:
             return kern
         kern = _get_elementwise_kernel(
             args_info, types, self.params, self.operation,
-            self.name, self.preamble, self.kwargs)
+            self.name, self.preamble, **self.kwargs)
 
         # Store the compiled kernel in the cache.
         # Potentially overwrite a duplicate cache entry because
         # _get_elementwise_kernel() may include IO wait.
-        _elementwise_kernel_memo[key] = kern
+        self._elementwise_kernel_memo[key] = kern
         return kern
 
 
@@ -890,8 +901,9 @@ cdef class ufunc:
         inout_args = []
         for i, t in enumerate(op.in_types):
             x = broad_values[i]
-            inout_args.append(x if isinstance(x, ndarray) else
-                              _scalar.get_scalar_from_numpy(x, t))
+            inout_args.append(
+                x if isinstance(x, ndarray) else
+                _scalar.CScalar.from_numpy_scalar_with_dtype(x, t))
         inout_args.extend(out_args)
         shape = _reduce_dims(inout_args, self._params, shape)
         indexer = _carray.Indexer(shape)
