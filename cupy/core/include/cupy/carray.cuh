@@ -319,8 +319,89 @@ public:
   }
 };
 
+
 template <>
 class CIndexer<0> {
+private:
+  ptrdiff_t size_;
+
+public:
+  static const int ndim = 0;
+
+  __device__ ptrdiff_t size() const {
+    return size_;
+  }
+
+  __device__ void set(ptrdiff_t i) {
+  }
+
+  __device__ const ptrdiff_t* get() const {
+    return NULL;
+  }
+};
+
+template <int _ndim>
+class FIndexer {
+public:
+  static const int ndim = _ndim;
+private:
+  ptrdiff_t size_;
+  ptrdiff_t shape_[ndim];
+  ptrdiff_t index_[ndim];
+
+  typedef ptrdiff_t index_t[ndim];
+
+public:
+  __device__ ptrdiff_t size() const {
+    return size_;
+  }
+
+  __device__ void set(ptrdiff_t i) {
+    // ndim == 0 case uses partial template specialization
+    if (ndim == 1) {
+      index_[0] = i;
+      return;
+    }
+    if (size_ > 1LL << 31) {
+      // 64-bit division is very slow on GPU
+      size_t a = static_cast<size_t>(i);
+      for (int dim = 0; dim < ndim - 1; dim++) {
+        size_t s = static_cast<size_t>(shape_[dim]);
+        if (s & (s - 1)) {
+          size_t t = a / s;
+          index_[dim] = a - t * s;
+          a = t;
+        } else { // exp of 2
+          index_[dim] = a & (s - 1);
+          a >>= __popcll(s - 1);
+        }
+      }
+      index_[ndim - 1] = a;
+    } else {
+      unsigned int a = static_cast<unsigned int>(i);
+      for (int dim = 0; dim < ndim - 1; dim++) {
+        unsigned int s = static_cast<unsigned int>(shape_[dim]);
+        if (s & (s - 1)) {
+          unsigned int t = a / s;
+          index_[dim] = a - t * s;
+          a = t;
+        } else { // exp of 2
+          index_[dim] = a & (s - 1);
+          a >>= __popc(s - 1);
+        }
+      }
+      index_[ndim - 1] = a;
+    }
+  }
+
+  __device__ const index_t& get() const {
+    return index_;
+  }
+};
+
+
+template <>
+class FIndexer<0> {
 private:
   ptrdiff_t size_;
 
