@@ -71,19 +71,28 @@ cdef ndarray _ndarray_argmin(ndarray self, axis, out, dtype, keepdims):
 
 
 cdef ndarray _ndarray_mean(ndarray self, axis, dtype, out, keepdims):
+    # Cast bool, unsigned int, and int to float64 by default
     if (cupy.cuda.cub_enabled and self.size != 0):
-        result = cub.cub_reduction(self, cub.CUPY_CUB_SUM, axis, dtype, out,
-                                   keepdims)
+        dtype_sum = dtype_out = dtype
+        if dtype is None:
+            if self.dtype.kind in 'ubi':
+                dtype_out = dtype_sum = numpy.float64
+            elif self.dtype.char == 'e':
+                dtype_sum = numpy.float32
+                dtype_out = numpy.float16
+        result = cub.cub_reduction(self, cub.CUPY_CUB_SUM, axis, dtype_sum,
+                                   out, keepdims)
         if result is not None:
-            if result.real.dtype.kind == 'f':
-                result /= (self.size / result.size)
-            else:
-                result = result / (self.size / result.size)
-            if dtype is not None:
-                result = result.astype(dtype, copy=False)
+            n = self.size // result.size
+            cupy.true_divide(result, n, out=result, casting='unsafe')
+            if dtype_out is not None and out is None:
+                result = result.astype(dtype_out, copy=False)
             return result
     dtype_out = None
-    if dtype is not None and numpy.dtype(dtype).kind not in ['c', 'f']:
+    if dtype is None and self.dtype.char == 'e':
+        dtype_out = numpy.float16
+        dtype = numpy.float32
+    elif dtype is not None and numpy.dtype(dtype).kind not in ['c', 'f']:
         dtype_out = dtype
         dtype = numpy.promote_types(dtype, numpy.float32)
     out = _mean(self, axis=axis, dtype=dtype, out=out, keepdims=keepdims)

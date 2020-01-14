@@ -85,6 +85,21 @@ __global__ void test_multiply(const TYPE* x1, const TYPE* x2, TYPE* y, \
 }
 '''
 
+test_const_mem = r'''
+extern "C"{
+__constant__ float some_array[100];
+
+__global__ void multiply_by_const(float* x, int N) {
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (id < N) {
+        x[id] *= some_array[id];
+    }
+}
+
+}
+'''
+
 # dynamic parallelism
 _test_source4 = r'''
 extern "C"{
@@ -387,6 +402,17 @@ class TestRaw(unittest.TestCase):
             self.mod2.get_function('no_such_kernel')
         assert 'CUDA_ERROR_NOT_FOUND' in str(ex.value)
 
+    def test_const_memory(self):
+        mod = cupy.RawModule(test_const_mem, backend=self.backend)
+        ker = mod.get_function('multiply_by_const')
+        mem_ptr = mod.get_global('some_array')
+        const_arr = cupy.ndarray((100,), cupy.float32, mem_ptr)
+        data = cupy.arange(100, dtype=cupy.float32)
+        const_arr[...] = data
+        output_arr = cupy.ones(100, dtype=cupy.float32)
+        ker((1,), (100,), (output_arr, cupy.int32(100)))
+        assert (data == output_arr).all()
+
     def test_dynamical_parallelism(self):
         ker = cupy.RawKernel(_test_source4, 'test_kernel', options=('-dc',),
                              backend=self.backend)
@@ -521,3 +547,68 @@ class TestRaw(unittest.TestCase):
         ker = mod.get_function('test_downcast')
         ker((grid,), (block,), (a, out_down))
         assert (out_down == a.astype(cupy.complex64)).all()
+
+
+_test_grid_sync = r'''
+#include <cooperative_groups.h>
+
+extern "C" __global__
+void test_grid_sync(const float* x1, const float* x2, float* y) {
+    namespace cg = cooperative_groups;
+    cg::grid_group grid = cg::this_grid();
+    int size = gridDim.x * blockDim.x;
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    y[tid] = x1[tid];
+    cg::sync(grid);
+    y[size - tid - 1] += x2[size - tid - 1];
+}
+'''
+
+
+@unittest.skipUnless(
+    9000 <= cupy.cuda.runtime.runtimeGetVersion(),
+    'Requires CUDA 9.x or later')
+@testing.parameterize(*testing.product({
+    'n': [10, 100, 256]
+}))
+class TestRawGridSync(unittest.TestCase):
+
+    def setUp(self):
+        global _test_cache_dir
+        _test_cache_dir = tempfile.mkdtemp()
+        os.environ['CUPY_CACHE_DIR'] = _test_cache_dir
+
+        self.kern_grid_sync = cupy.RawKernel(
+            _test_grid_sync, 'test_grid_sync', backend='nvcc',
+            enable_cooperative_groups=True)
+        self.mod_grid_sync = cupy.RawModule(
+            code=_test_grid_sync, backend='nvcc',
+            enable_cooperative_groups=True)
+
+    def tearDown(self):
+        # To avoid cache interference, we remove cached files after every test,
+        # and restore users' old setting
+        global _test_cache_dir
+        shutil.rmtree(_test_cache_dir)
+        if _is_cache_env_var_set:
+            os.environ['CUPY_CACHE_DIR'] = _old_cache_dir
+        else:
+            os.environ.pop('CUPY_CACHE_DIR')
+        compiler._empty_file_preprocess_cache = {}
+
+    def test_grid_sync_rawkernel(self):
+        n = self.n
+        x1 = cupy.arange(n ** 2, dtype='float32').reshape(n, n)
+        x2 = cupy.ones((n, n), dtype='float32')
+        y = cupy.zeros((n, n), dtype='float32')
+        self.kern_grid_sync((n,), (n,), (x1, x2, y, n ** 2))
+        assert cupy.allclose(y, x1 + x2)
+
+    def test_grid_sync_rawmodule(self):
+        n = self.n
+        x1 = cupy.arange(n ** 2, dtype='float32').reshape(n, n)
+        x2 = cupy.ones((n, n), dtype='float32')
+        y = cupy.zeros((n, n), dtype='float32')
+        kern = self.mod_grid_sync.get_function('test_grid_sync')
+        kern((n,), (n,), (x1, x2, y, n ** 2))
+        assert cupy.allclose(y, x1 + x2)
