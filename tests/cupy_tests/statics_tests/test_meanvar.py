@@ -90,13 +90,13 @@ class TestMeanVar(unittest.TestCase):
 
     @testing.for_all_dtypes(no_complex=True)
     @testing.numpy_cupy_allclose()
-    def test_mean_real_dtypes_as_float(self, xp, dtype):
+    def test_mean_dtypes_as_float(self, xp, dtype):
         a = xp.full((2, 3, 4), 123456789, dtype=dtype)
         return xp.mean(a, dtype=numpy.float64)
 
     @testing.for_all_dtypes(no_complex=True)
     @testing.numpy_cupy_allclose()
-    def test_mean_real_dtypes_as_int(self, xp, dtype):
+    def test_mean_dtypes_as_int(self, xp, dtype):
         a = testing.shaped_arange((2, 3, 4), xp, dtype)
         return xp.mean(a, dtype=numpy.int64)
 
