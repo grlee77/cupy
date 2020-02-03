@@ -1,14 +1,13 @@
 # distutils: language = c++
 
-from __future__ import division
 import os
+import pickle
 import re
 import sys
 import warnings
 
 import ctypes
 import numpy
-import six
 
 import cupy
 from cupy.core import _errors
@@ -328,11 +327,11 @@ cdef class ndarray:
         :func:`cupy.load`.
 
         """
-        six.moves.cPickle.dump(self, file, -1)
+        pickle.dump(self, file, -1)
 
     cpdef bytes dumps(self):
         """Dumps a pickle of the array to a string."""
-        return six.moves.cPickle.dumps(self, -1)
+        return pickle.dumps(self, -1)
 
     cpdef ndarray astype(
             self, dtype, order='K', casting=None, subok=None, copy=True):
@@ -1155,7 +1154,7 @@ cdef class ndarray:
     def __iter__(self):
         if self._shape.size() == 0:
             raise TypeError('iteration over a 0-d array')
-        return (self[i] for i in six.moves.range(self._shape[0]))
+        return (self[i] for i in range(self._shape[0]))
 
     def __len__(self):
         if self._shape.size() == 0:
@@ -1355,11 +1354,6 @@ cdef class ndarray:
 
     def __int__(self):
         return int(self.get())
-
-    if sys.version_info < (3,):
-        def __long__(self):
-            # Avoid using long() for flake8
-            return self.get().__long__()
 
     def __float__(self):
         return float(self.get())
@@ -2944,7 +2938,7 @@ cpdef ndarray _convert_object_with_cuda_array_interface(a):
     cdef object desc = a.__cuda_array_interface__
     cdef tuple shape = desc['shape']
     cdef int dev_id = -1
-    cdef int nbytes
+    cdef size_t nbytes
 
     ptr = desc['data'][0]
     dtype = numpy.dtype(desc['typestr'])
