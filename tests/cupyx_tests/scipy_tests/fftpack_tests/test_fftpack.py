@@ -589,6 +589,7 @@ class TestFftnView(unittest.TestCase):
 
     @testing.for_complex_dtypes()
     def test_fortran_ordered_view(self, dtype):
+        # Test case for: https://github.com/cupy/cupy/issues/3033
         a = testing.shaped_random(self.shape, cupy, dtype)
         if self.data_order == 'F':
             a = cupy.asfortranarray(a)
