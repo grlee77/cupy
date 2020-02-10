@@ -2978,7 +2978,8 @@ cpdef Py_ssize_t ndim(object a):
 
     Args:
         a (array-like): If it is not already an cupy.ndarray, a conversion via
-            numpy.asarray() is attempted.
+            :func:`numpy.asarray` is attempted.
+
 
     Returns:
         n (int): The number of dimensions.
