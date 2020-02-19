@@ -232,6 +232,8 @@ def logspace(start, stop, num=50, endpoint=True, base=10.0, dtype=None,
 
     """
     y = linspace(start, stop, num=num, endpoint=endpoint, axis=axis)
+    if dtype is None:
+        return core.power(base, y)
     return core.power(base, y).astype(dtype, copy=False)
 
 
