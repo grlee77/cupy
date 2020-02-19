@@ -257,7 +257,7 @@ class TestRanges(unittest.TestCase):
                                         no_bool=True, no_complex=True)
     @testing.numpy_cupy_allclose()
     def test_logspace_array_start_stop(self, xp, dtype_range, dtype_out):
-        start = xp.array([0, 2], dtype=dtype_range)
+        start = xp.array([0, 2], dtype=float)
         stop = xp.array([2, 1], dtype=dtype_range)
         return xp.logspace(start, stop, num=10, dtype=dtype_out)
 
@@ -266,7 +266,7 @@ class TestRanges(unittest.TestCase):
                                         no_bool=True, no_complex=True)
     @testing.numpy_cupy_allclose()
     def test_logspace_array_start_stop_axis1(self, xp, dtype_range, dtype_out):
-        start = xp.array([0, 2], dtype=dtype_range)
+        start = xp.array([0, 2], dtype=float)
         stop = xp.array([2, 1], dtype=dtype_range)
         return xp.logspace(start, stop, num=50, dtype=dtype_out, axis=0)
 
