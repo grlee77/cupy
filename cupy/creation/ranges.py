@@ -123,7 +123,7 @@ def linspace(start, stop, num=50, endpoint=True, retstep=False, dtype=None,
         stop (scalar or array_like): Ending value(s) of the sequence, unless
             `endpoint` is set to False. In that case, the sequence consists of
             all but the last of ``num + 1`` evenly spaced samples, so that
-            `stop` is excluded.  Note that the step size changes when
+            `stop` is excluded. Note that the step size changes when
             `endpoint` is False.
         num: Number of elements.
         endpoint (bool): If ``True``, the stop value is included as the last
@@ -208,8 +208,12 @@ def logspace(start, stop, num=50, endpoint=True, base=10.0, dtype=None):
     function requires the total number of elements specified.
 
     Args:
-        start: Start of the interval.
-        stop: End of the interval.
+        start (scalar or array_like): ``base ** start`` are the starting
+            value(s) of the sequence.
+        stop (scalar or array_like): ``base ** stop`` are the ending value(s)
+            of the sequence, unless `endpoint` is set to False. In that case,
+            the sequence consists of all but the last of ``num + 1`` evenly
+            spaced samples, so that `stop` is excluded.
         num: Number of elements.
         endpoint (bool): If ``True``, the stop value is included as the last
             element. Otherwise, the stop value is omitted.
