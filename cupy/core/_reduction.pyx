@@ -25,7 +25,8 @@ from cupy.cuda cimport runtime
 
 import string
 
-from cupy.core import _errors
+import numpy
+
 from cupy.core._kernel import _get_param_info
 from cupy.core._kernel import _decide_params_type
 from cupy.cuda import compiler
