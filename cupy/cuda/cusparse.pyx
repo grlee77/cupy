@@ -2043,12 +2043,8 @@ cpdef int zcsrilu02_bufferSize(intptr_t handle, int m, int nnz, size_t descrA,
             &pBufferSizeInBytes)
     check_status(status)
     return <int>pBufferSizeInBytes
-<<<<<<< HEAD
-cpdef scsrilu02_analysis(size_t handle, int m, int nnz, size_t descrA,
-=======
 
 cpdef scsrilu02_analysis(intptr_t handle, int m, int nnz, size_t descrA,
->>>>>>> upstream/master
                          size_t csrSortedValA, size_t csrSortedRowPtrA,
                          size_t csrSortedColIndA, size_t info, int policy,
                          size_t pBuffer):
@@ -2429,12 +2425,8 @@ cpdef int zcsric02_bufferSize(intptr_t handle, int m, int nnz, size_t descrA,
             &pBufferSizeInBytes)
     check_status(status)
     return <int>pBufferSizeInBytes
-<<<<<<< HEAD
-cpdef scsric02_analysis(size_t handle, int m, int nnz, size_t descrA,
-=======
 
 cpdef scsric02_analysis(intptr_t handle, int m, int nnz, size_t descrA,
->>>>>>> upstream/master
                         size_t csrSortedValA, size_t csrSortedRowPtrA,
                         size_t csrSortedColIndA, size_t info, int policy,
                         size_t pBuffer):
