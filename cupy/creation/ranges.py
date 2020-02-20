@@ -123,7 +123,7 @@ def linspace(start, stop, num=50, endpoint=True, retstep=False, dtype=None,
         stop (scalar or array_like): Ending value(s) of the sequence, unless
             `endpoint` is set to False. In that case, the sequence consists of
             all but the last of ``num + 1`` evenly spaced samples, so that
-            `stop` is excluded.  Note that the step size changes when
+            `stop` is excluded. Note that the step size changes when
             `endpoint` is False.
         num: Number of elements.
         endpoint (bool): If ``True``, the stop value is included as the last
@@ -201,15 +201,20 @@ def linspace(start, stop, num=50, endpoint=True, retstep=False, dtype=None,
         return ret.astype(dtype, copy=False)
 
 
-def logspace(start, stop, num=50, endpoint=True, base=10.0, dtype=None):
+def logspace(start, stop, num=50, endpoint=True, base=10.0, dtype=None,
+             axis=0):
     """Returns an array with evenly-spaced values on a log-scale.
 
     Instead of specifying the step width like :func:`cupy.arange`, this
     function requires the total number of elements specified.
 
     Args:
-        start: Start of the interval.
-        stop: End of the interval.
+        start (scalar or array_like): ``base ** start`` are the starting
+            value(s) of the sequence.
+        stop (scalar or array_like): ``base ** stop`` are the ending value(s)
+            of the sequence, unless `endpoint` is set to False. In that case,
+            the sequence consists of all but the last of ``num + 1`` evenly
+            spaced samples, so that `stop` is excluded.
         num: Number of elements.
         endpoint (bool): If ``True``, the stop value is included as the last
             element. Otherwise, the stop value is omitted.
@@ -217,15 +222,19 @@ def logspace(start, stop, num=50, endpoint=True, base=10.0, dtype=None):
             elements on a log-scale are the same as ``base``.
         dtype: Data type specifier. It is inferred from the start and stop
             arguments by default.
+        axis (int):  The axis in the result to store the samples.  Relevant
+            only if start or stop are array-like.  By default (0), the samples
+            will be along a new axis inserted at the beginning. Use -1 to get
+            an axis at the end.
 
     Returns:
         cupy.ndarray: The 1-D array of ranged values.
 
     """
-    y = linspace(start, stop, num=num, endpoint=endpoint)
+    y = linspace(start, stop, num=num, endpoint=endpoint, axis=axis)
     if dtype is None:
         return core.power(base, y)
-    return core.power(base, y).astype(dtype)
+    return core.power(base, y).astype(dtype, copy=False)
 
 
 def meshgrid(*xi, **kwargs):

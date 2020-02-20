@@ -223,6 +223,11 @@ class TestRanges(unittest.TestCase):
 
     @testing.for_all_dtypes(no_bool=True)
     @testing.numpy_cupy_allclose()
+    def test_logspace_ten_num(self, xp, dtype):
+        return xp.logspace(3, 1, 10, dtype=dtype)
+
+    @testing.for_all_dtypes(no_bool=True)
+    @testing.numpy_cupy_allclose()
     def test_logspace_no_endpoint(self, xp, dtype):
         return xp.logspace(0, 2, 5, dtype=dtype, endpoint=False)
 
@@ -246,6 +251,32 @@ class TestRanges(unittest.TestCase):
     @testing.numpy_cupy_allclose()
     def test_logspace_base(self, xp, dtype):
         return xp.logspace(0, 2, 5, base=2.0, dtype=dtype)
+
+    @testing.with_requires('numpy>=1.16')
+    @testing.for_all_dtypes_combination(names=('dtype_range', 'dtype_out'),
+                                        no_bool=True, no_complex=True)
+    @testing.numpy_cupy_allclose()
+    def test_logspace_array_start_stop(self, xp, dtype_range, dtype_out):
+        start = xp.array([0, 2], dtype=float)
+        stop = xp.array([2, 1], dtype=dtype_range)
+        return xp.logspace(start, stop, num=10, dtype=dtype_out)
+
+    @testing.with_requires('numpy>=1.16')
+    @testing.for_all_dtypes_combination(names=('dtype_range', 'dtype_out'),
+                                        no_bool=True, no_complex=True)
+    @testing.numpy_cupy_allclose()
+    def test_logspace_array_start_stop_axis1(self, xp, dtype_range, dtype_out):
+        start = xp.array([0, 2], dtype=float)
+        stop = xp.array([2, 1], dtype=dtype_range)
+        return xp.logspace(start, stop, num=50, dtype=dtype_out, axis=0)
+
+    @testing.with_requires('numpy>=1.16')
+    @testing.for_complex_dtypes()
+    @testing.numpy_cupy_allclose()
+    def test_logspace_complex_start_stop(self, xp, dtype):
+        start = xp.array([0, 2], dtype=dtype)
+        stop = xp.array([2, 1], dtype=dtype)
+        return xp.logspace(start, stop, num=10, dtype=dtype)
 
 
 @testing.parameterize(
