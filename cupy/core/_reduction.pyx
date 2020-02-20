@@ -119,7 +119,7 @@ cpdef tuple _get_axis(object axis, Py_ssize_t ndim):
 
     for dim in axis:
         if dim < -ndim or dim >= ndim:
-            raise _errors._AxisError('Axis overrun')
+            raise numpy.AxisError('Axis overrun')
     if num_axes == 1:
         if dim < 0:
             reduce_axis = (dim + ndim,)
