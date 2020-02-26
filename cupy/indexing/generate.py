@@ -1,6 +1,8 @@
 # class s_(object):
 
+import functools
 import numbers
+import operator
 
 import numpy
 
@@ -227,7 +229,7 @@ def ix_(*args):
 
         This function may synchronize the device.
 
-     .. seealso:: :func:`numpy.ix_`
+    .. seealso:: :func:`numpy.ix_`
 
     """
     # TODO(niboshi): Avoid nonzero which may synchronize the device.
@@ -247,10 +249,10 @@ def ix_(*args):
     return tuple(out)
 
 
-def ravel_multi_index(multi_index, dims, mode='raise', order='C'):
+def ravel_multi_index(multi_index, dims, mode='wrap', order='C'):
     """
-    Converts a tuple of index arrays into an array of flat
-    indices, applying boundary modes to the multi-index.
+    Converts a tuple of index arrays into an array of flat indices, applying
+    boundary modes to the multi-index.
 
     Args:
         multi_index (tuple of cupy.ndarray) : A tuple of integer arrays, one
@@ -259,10 +261,12 @@ def ravel_multi_index(multi_index, dims, mode='raise', order='C'):
             ``multi_index`` apply.
         mode ('raise', 'wrap' or 'clip'), optional: Specifies how out-of-bounds
             indices are handled.  Can specify either one mode or a tuple of
-            modes, one mode per index.
-            * 'raise' -- raise an error (default)
-            * 'wrap' -- wrap around
-            * 'clip' -- clip to the range
+            modes, one mode per index:
+
+            - *'raise'* -- raise an error
+            - *'wrap'* -- wrap around (default)
+            - *'clip'* -- clip to the range
+
             In 'clip' mode, a negative index which would normally wrap will
             clip to 0 instead.
         order ('C' or 'F'), optional: Determines whether the multi-index should
@@ -272,6 +276,15 @@ def ravel_multi_index(multi_index, dims, mode='raise', order='C'):
     Returns:
         raveled_indices (cupy.ndarray): An array of indices into the flattened
             version of an array of dimensions ``dims``.
+
+    .. warning::
+
+        This function may synchronize the device when ``mode == 'raise'``.
+
+    Notes
+    -----
+    Note that the default `mode` (``'wrap'``) is different than in NumPy. This
+    is done to avoid potential device synchronization.
 
     Examples
     --------
@@ -313,8 +326,14 @@ def ravel_multi_index(multi_index, dims, mode='raise', order='C'):
     if isinstance(mode, str):
         mode = (mode, ) * ndim
 
+    if functools.reduce(operator.mul, dims) > cupy.iinfo(cupy.int64).max:
+        raise ValueError("invalid dims: array size defined by dims is larger "
+                         "than the maximum possible size")
+
     s = 1
     ravel_strides = [1] * ndim
+    if order is None:
+        order = "C"
     if order == "C":
         for i in range(ndim - 2, -1, -1):
             s = s * dims[i + 1]
@@ -324,10 +343,21 @@ def ravel_multi_index(multi_index, dims, mode='raise', order='C'):
             s = s * dims[i - 1]
             ravel_strides[i] = s
     else:
-        raise ValueError("only 'C' or 'F' order is permitted")
+        raise TypeError("order not understood")
 
-    raveled_indices = 0
+    multi_index = cupy.broadcast_arrays(*multi_index)
+    raveled_indices = cupy.zeros(multi_index[0].shape, dtype=cupy.int64)
     for d, stride, idx, _mode in zip(dims, ravel_strides, multi_index, mode):
+
+        if not isinstance(idx, cupy.ndarray):
+            raise TypeError("elements of multi_index must be cupy arrays")
+        if not cupy.can_cast(idx, cupy.int64, 'same_kind'):
+            raise TypeError(
+                'multi_index entries could not be cast from dtype(\'{}\') to '
+                'dtype(\'{}\') according to the rule \'same_kind\''.format(
+                    idx.dtype, cupy.int64().dtype))
+        idx = idx.astype(cupy.int64, copy=False)
+
         if _mode == "raise":
             if cupy.any(cupy.logical_or(idx >= d, idx < 0)):
                 raise ValueError("invalid entry in coordinates array")
@@ -336,7 +366,7 @@ def ravel_multi_index(multi_index, dims, mode='raise', order='C'):
         elif _mode == 'wrap':
             idx = idx % d
         else:
-            raise ValueError("Unrecognized mode: {}".format(_mode))
+            raise TypeError("Unrecognized mode: {}".format(_mode))
         raveled_indices += stride * idx
     return raveled_indices
 

@@ -309,6 +309,7 @@ from cupy.manipulation.join import stack  # NOQA
 from cupy.manipulation.join import vstack  # NOQA
 
 from cupy.manipulation.kind import asfortranarray  # NOQA
+from cupy.manipulation.kind import require  # NOQA
 
 from cupy.manipulation.split import array_split  # NOQA
 from cupy.manipulation.split import dsplit  # NOQA
@@ -333,6 +334,7 @@ from cupy.manipulation.rearrange import rot90  # NOQA
 from cupy.binary.elementwise import bitwise_and  # NOQA
 from cupy.binary.elementwise import bitwise_or  # NOQA
 from cupy.binary.elementwise import bitwise_xor  # NOQA
+from cupy.binary.elementwise import bitwise_not  # NOQA
 from cupy.binary.elementwise import invert  # NOQA
 from cupy.binary.elementwise import left_shift  # NOQA
 from cupy.binary.elementwise import right_shift  # NOQA
@@ -437,7 +439,9 @@ from cupy.indexing.generate import ravel_multi_index  # NOQA
 from cupy.indexing.generate import unravel_index  # NOQA
 
 from cupy.indexing.indexing import choose  # NOQA
+from cupy.indexing.indexing import compress  # NOQA
 from cupy.indexing.indexing import diagonal  # NOQA
+from cupy.indexing.indexing import extract  # NOQA
 from cupy.indexing.indexing import take  # NOQA
 from cupy.indexing.indexing import take_along_axis  # NOQA
 
