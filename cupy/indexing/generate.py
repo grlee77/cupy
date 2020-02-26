@@ -311,12 +311,6 @@ def ravel_multi_index(multi_index, dims, mode='wrap', order='C'):
             "parameter multi_index must be a sequence of "
             "length {}".format(ndim))
 
-    for arr in multi_index:
-        if not isinstance(arr, cupy.ndarray):
-            raise TypeError("elements of multi_index must be cupy arrays")
-        if arr.dtype.kind not in 'iu':
-            raise TypeError("only int indices permitted")
-
     for d in dims:
         if not isinstance(d, numbers.Integral):
             raise TypeError(
@@ -369,6 +363,7 @@ def ravel_multi_index(multi_index, dims, mode='wrap', order='C'):
             raise TypeError("Unrecognized mode: {}".format(_mode))
         raveled_indices += stride * idx
     return raveled_indices
+
 
 
 def unravel_index(indices, dims, order='C'):
