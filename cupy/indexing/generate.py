@@ -365,6 +365,7 @@ def ravel_multi_index(multi_index, dims, mode='wrap', order='C'):
     return raveled_indices
 
 
+
 def unravel_index(indices, dims, order='C'):
     """Converts array of flat indices into a tuple of coordinate arrays.
 
