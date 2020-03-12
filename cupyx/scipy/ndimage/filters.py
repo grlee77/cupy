@@ -192,51 +192,44 @@ def _generate_correlete_kernel(mode, cval, xshape, wshape, nnz, origin):
     in_params = "raw X x, raw I wlocs, raw W wvals"
     out_params = "Y y"
 
-    ndim = len(wshape)
-
     ops = []
-    ops.append("const int sx_{} = 1;".format(ndim - 1))
-    for j in range(ndim - 1, 0, -1):
-        ops.append(
-            "int sx_{jm} = sx_{j} * {xsize_j};".format(
-                jm=j - 1, j=j, xsize_j=xshape[j]
-            )
-        )
-    ops.append("int _i = i;")
-    for j in range(ndim - 1, -1, -1):
-        ops.append(
-            "int cx_{j} = _i % {xsize} - ({wsize} / 2) - ({origin});".format(
-                j=j, xsize=xshape[j], wsize=wshape[j], origin=origin[j]
-            )
-        )
-        if j > 0:
-            ops.append("_i /= {xsize};".format(xsize=xshape[j]))
-    ops.append("W sum = (W)0;")
-    ops.append(
-        """
-        for (int iw = 0; iw < {nnz}; iw++)
-        {{
-        """.format(nnz=nnz)
-    )
-    for j in range(ndim):
-        ops.append(
-            """
-                //iloc += {nnz};
-                int iw_{j} = wlocs[iw + {j} * {nnz}];
-                int ix_{j} = cx_{j} + iw_{j};""".format(j=j, nnz=nnz)
-        )
-        ixvar = "ix_{}".format(j)
-        ops.append(_generate_boundary_condition_ops(mode, ixvar, xshape[j]))
+    ops.append('X* x_data = (X*)&(x[0]);')
+    ops.append('W* w_data = (W*)&(w[0]);')
+    ops.append('const int sx_{} = 1;'.format(ndim-1))
+    for j in range(ndim-1, 0, -1):
+        ops.append('int sx_{jm} = sx_{j} * {xsize_j};'.
+                   format(jm=j-1, j=j, xsize_j=xshape[j]))
+    ops.append('int _i = i;')
+    for j in range(ndim-1, -1, -1):
+        ops.append('int cx_{j} = _i % {xsize} - ({wsize} / 2) - ({origin});'
+                   .format(j=j, xsize=xshape[j], wsize=wshape[j],
+                           origin=origin[j]))
+        if (j > 0):
+            ops.append('_i /= {xsize};'.format(xsize=xshape[j]))
+    ops.append('W sum = (W)0;')
+    ops.append('int iw = 0;')
+
         ops.append("        ix_{j} *= sx_{j};".format(j=j))
     _cond = " || ".join(["(ix_{0} < 0)".format(j) for j in range(ndim)])
     _expr = " + ".join(["ix_{0}".format(j) for j in range(ndim)])
     ops.append(
         """
+        ops.append('        ix_{j} *= sx_{j};'.format(j=j))
+
+    ops.append('''
+        W wval = w_data[iw];
+        if (wval == (W)0) {{
+            iw += 1;
+            continue;
+        }}''')
+    _cond = ' || '.join(['(ix_{0} < 0)'.format(j) for j in range(ndim)])
+    _expr = ' + '.join(['ix_{0}'.format(j) for j in range(ndim)])
+    ops.append('''
         if ({cond}) {{
             sum += (W){cval} * wvals[iw];
         }} else {{
             int ix = {expr};
-            sum += (W)x[ix] * wvals[iw];
+            sum += (W)x_data[ix] * wval;
         }}
         """.format(
             cond=_cond, expr=_expr, cval=cval,
