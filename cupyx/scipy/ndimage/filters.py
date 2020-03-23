@@ -294,7 +294,7 @@ def _min_or_max_filter(input, size, footprint, structure, output, mode,
     input_shape = cupy.array(input.shape, dtype=cupy.int32)
     if structure is None:
         structure = cupy.empty(0, dtype=cupy.float64)
-    output = _get_output(output, input)
+    output = _get_output(output, input, weights_dtype=cupy.dtype(cupy.float64))
     return kernel(input, input_shape, footprint, structure, output)
 
 
