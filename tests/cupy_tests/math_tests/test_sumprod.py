@@ -570,3 +570,14 @@ class TestDiff(unittest.TestCase):
     def test_diff_2dim_with_scalar_append(self, xp, dtype):
         a = testing.shaped_arange((4, 5), xp, dtype)
         return xp.diff(a, prepend=1, append=0)
+
+    def test_diff_invalid_axis(self, xp):
+        a = testing.shaped_arange((2, 3, 4), xp)
+        with pytest.raises(numpy.AxisError):
+            return xp.diff(a, axis=3)
+
+    @testing.numpy_cupy_raises(accept_error=numpy.AxisError)
+    def test_diff_invalid_axis2(self, xp):
+        a = testing.shaped_arange((2, 3, 4), xp)
+        with pytest.raises(numpy.AxisError):
+            return xp.diff(a, axis=-4)
