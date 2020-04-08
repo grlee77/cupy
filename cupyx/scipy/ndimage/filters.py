@@ -384,8 +384,6 @@ def _get_min_or_max_kernel(ndim, fp_shape, use_structure, modes, cval,
     in_params, out_params, operation, name = _generate_min_or_max_kernel(
         ndim, fp_shape, use_structure, modes, cval, origins, minimum)
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
-<<<<<<< HEAD
-=======
 
 
 def minimum_filter(input, size=None, footprint=None, output=None,
