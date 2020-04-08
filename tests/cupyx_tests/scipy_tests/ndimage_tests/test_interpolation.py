@@ -53,6 +53,15 @@ class TestMapCoordinates(unittest.TestCase):
 
     @testing.for_float_dtypes(no_float16=True)
     @testing.numpy_cupy_allclose(atol=1e-5, scipy_name='scp')
+    def test_map_coordinates_fortran_order(self, xp, scp, dtype):
+        a = testing.shaped_random((100, 100), xp, dtype)
+        coordinates = testing.shaped_random((a.ndim, 100), xp, dtype)
+        a = xp.asfortranarray(a)
+        coordinates = xp.asfortranarray(coordinates)
+        return self._map_coordinates(xp, scp, a, coordinates)
+
+    @testing.for_float_dtypes(no_float16=True)
+    @testing.numpy_cupy_allclose(atol=1e-5, scipy_name='scp')
     def test_map_coordinates_float_nd_coords(self, xp, scp, dtype):
         a = testing.shaped_random((100, 100), xp, dtype)
         coordinates = testing.shaped_random((a.ndim, 10, 10), xp, dtype,
@@ -121,6 +130,15 @@ class TestAffineTransform(unittest.TestCase):
     def test_affine_transform_float(self, xp, scp, dtype):
         a = testing.shaped_random((100, 100), xp, dtype)
         matrix = testing.shaped_random(self.matrix_shape, xp, dtype)
+        return self._affine_transform(xp, scp, a, matrix)
+
+    @testing.for_float_dtypes(no_float16=True)
+    @testing.numpy_cupy_allclose(atol=1e-5, scipy_name='scp')
+    def test_affine_transform_fortran_order(self, xp, scp, dtype):
+        a = testing.shaped_random((100, 100), xp, dtype)
+        a = cupy.asfortranarray(a)
+        matrix = testing.shaped_random(self.matrix_shape, xp, dtype)
+        matrix = xp.asfortranarray(matrix)
         return self._affine_transform(xp, scp, a, matrix)
 
     @testing.for_int_dtypes(no_bool=True)
@@ -339,6 +357,13 @@ class TestShift(unittest.TestCase):
         a = testing.shaped_random((100, 100), xp, dtype)
         return self._shift(xp, scp, a)
 
+    @testing.for_float_dtypes(no_float16=True)
+    @testing.numpy_cupy_allclose(atol=1e-5, scipy_name='scp')
+    def test_shift_fortran_order(self, xp, scp, dtype):
+        a = testing.shaped_random((100, 100), xp, dtype)
+        a = xp.asfortranarray(a)
+        return self._shift(xp, scp, a)
+
     @testing.for_int_dtypes(no_bool=True)
     @testing.numpy_cupy_allclose(atol=1e-5, scipy_name='scp')
     def test_shift_int(self, xp, scp, dtype):
@@ -406,6 +431,13 @@ class TestZoom(unittest.TestCase):
     @testing.numpy_cupy_allclose(atol=1e-5, scipy_name='scp')
     def test_zoom_float(self, xp, scp, dtype):
         a = testing.shaped_random((100, 100), xp, dtype)
+        return self._zoom(xp, scp, a)
+
+    @testing.for_float_dtypes(no_float16=True)
+    @testing.numpy_cupy_allclose(atol=1e-5, scipy_name='scp')
+    def test_zoom_fortran_order(self, xp, scp, dtype):
+        a = testing.shaped_random((100, 100), xp, dtype)
+        a = xp.asfortranarray(a)
         return self._zoom(xp, scp, a)
 
     @testing.for_int_dtypes(no_bool=True)
