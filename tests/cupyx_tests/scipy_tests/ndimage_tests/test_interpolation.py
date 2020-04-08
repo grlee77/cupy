@@ -230,6 +230,13 @@ class TestRotate(unittest.TestCase):
         a = testing.shaped_random((10, 10), xp, dtype)
         return self._rotate(xp, scp, a)
 
+    @testing.for_float_dtypes(no_float16=True)
+    @testing.numpy_cupy_allclose(atol=1e-5, scipy_name='scp')
+    def test_rotate_fortran_order(self, xp, scp, dtype):
+        a = testing.shaped_random((10, 10), xp, dtype)
+        a = xp.asfortranarray(a)
+        return self._rotate(xp, scp, a)
+
     @testing.for_int_dtypes(no_bool=True)
     @testing.numpy_cupy_allclose(atol=1e-5, scipy_name='scp')
     def test_rotate_int(self, xp, scp, dtype):
