@@ -1,7 +1,6 @@
 import numpy
 
 import cupy
-from cupy import core
 
 
 def place(arr, mask, vals):
@@ -70,12 +69,6 @@ def put(a, ind, v, mode='wrap'):
 # TODO(okuta): Implement putmask
 
 
-_fill_diagonal_kernel = core.ElementwiseKernel(
-    'int64 start, int64 step, raw T val', 'raw T a',
-    'a[start + i * step] = val[i % val.size()]',
-    'cupy_fill_diagonal')
-
-
 def fill_diagonal(a, val, wrap=False):
     """Fills the main diagonal of the given array of any dimensionality.
 
@@ -104,7 +97,7 @@ def fill_diagonal(a, val, wrap=False):
     # The followings are imported from the original numpy
     if a.ndim < 2:
         raise ValueError('array must be at least 2-d')
-    end = a.size
+    end = None
     if a.ndim == 2:
         step = a.shape[1] + 1
         if not wrap:
@@ -114,7 +107,79 @@ def fill_diagonal(a, val, wrap=False):
             raise ValueError('All dimensions of input must be of equal length')
         step = 1 + numpy.cumprod(a.shape[:-1]).sum()
 
-    val = cupy.asarray(val, dtype=a.dtype)
+    a.flat[:end:step] = val
 
-    size = end // step + 1
-    _fill_diagonal_kernel(0, step, val, a, size=size)
+
+def diag_indices(n, ndim=2):
+    """ Return the indices to access the main diagonal of an array.
+
+    Returns a tuple of indices that can be used to access the main
+    diagonal of an array with ``ndim >= 2`` dimensions and shape
+    (n, n, ..., n).
+
+    Args:
+        n (int): The size, along each dimension of the arrays for which
+            the indices are to be returned.
+        ndim (int): The number of dimensions. default `2`.
+
+    Examples
+    --------
+    Create a set of indices to access the diagonal of a (4, 4) array:
+    >>> dig = cupy.diag_indices(4)
+    >>> dig
+    (array([0, 1, 2, 3]), array([0, 1, 2, 3]))
+    >>> a = cupy.arange(16).reshape(4, 4)
+    >>> a
+    array([[ 0,  1,  2,  3],
+           [ 4,  5,  6,  7],
+           [ 8,  9, 10, 11],
+           [12, 13, 14, 15]])
+    >>> a[di] = 100
+    >>> a
+    array([[100,   1,   2,   3],
+           [  4, 100,   6,   7],
+           [  8,   9, 100,  11],
+           [ 12,  13,  14, 100]])
+
+    Create indices to manipulate a 3-D array:
+    >>> d3 = cupy.diag_indices(2, 3)
+    >>> d3
+    (array([0, 1]), array([0, 1]), array([0, 1]))
+    And use it to set the diagonal of an array of zeros to 1:
+    >>> a = cupy.zeros((2, 2, 2), dtype=int)
+    >>> a[d3] = 1
+    >>> a
+    array([[[1, 0],
+            [0, 0]],
+           [[0, 0],
+            [0, 1]]])
+
+     .. seealso:: :func:`numpy.diag_indices`
+
+    """
+    idx = cupy.arange(n)
+    return (idx,) * ndim
+
+
+def diag_indices_from(arr):
+    """
+    Return the indices to access the main diagonal of an n-dimensional array.
+    See `diag_indices` for full details.
+
+    Args:
+        arr (cupy.ndarray): At least 2-D.
+
+     .. seealso:: :func:`numpy.diag_indices_from`
+
+    """
+    if not isinstance(arr, cupy.ndarray):
+        raise TypeError("Argument must be cupy.ndarray")
+
+    if not arr.ndim >= 2:
+        raise ValueError("input array must be at least 2-d")
+    # For more than d=2, the strided formula is only valid for arrays with
+    # all dimensions equal, so we check first.
+    if not cupy.all(cupy.diff(arr.shape) == 0):
+        raise ValueError("All dimensions of input must be of equal length")
+
+    return diag_indices(arr.shape[0], arr.ndim)

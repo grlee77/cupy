@@ -589,7 +589,7 @@ class TestFftnView(unittest.TestCase):
 
     @testing.for_complex_dtypes()
     def test_contiguous_view(self, dtype):
-        # Fortran-ordered case tests: https://github.com/cupy/cupy/issues/3033
+        # Fortran-ordered case tests: https://github.com/cupy/cupy/issues/3079
         a = testing.shaped_random(self.shape, cupy, dtype)
         if self.data_order == 'F':
             a = cupy.asfortranarray(a)
