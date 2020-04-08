@@ -1,6 +1,7 @@
 import unittest
 
 import numpy
+import pytest
 
 import cupy
 from cupy import testing
@@ -145,7 +146,7 @@ class TestAffineTransform(unittest.TestCase):
 @testing.with_requires('scipy')
 class TestAffineExceptions(unittest.TestCase):
 
-    def test_invalid_affine_ndim(self)
+    def test_invalid_affine_ndim(self):
         ndimage_modules = (scipy.ndimage, cupyx.scipy.ndimage)
         for (xp, ndi) in zip((numpy, cupy), ndimage_modules):
             x = xp.ones((8, 8, 8))
@@ -155,7 +156,7 @@ class TestAffineExceptions(unittest.TestCase):
             with pytest.raises(RuntimeError):
                 ndi.affine_transform(x, xp.ones(()))
 
-    def test_invalid_affine_shape(self)
+    def test_invalid_affine_shape(self):
         ndimage_modules = (scipy.ndimage, cupyx.scipy.ndimage)
         for (xp, ndi) in zip((numpy, cupy), ndimage_modules):
             x = xp.ones((8, 8, 8))
@@ -250,7 +251,7 @@ class TestRotate(unittest.TestCase):
 @testing.with_requires('scipy')
 class TestRotateExceptions(unittest.TestCase):
 
-    def test_rotate_invalid_plane(self)
+    def test_rotate_invalid_plane(self):
         ndimage_modules = (scipy.ndimage, cupyx.scipy.ndimage)
         for (xp, ndi) in zip((numpy, cupy), ndimage_modules):
             x = xp.ones((8, 8, 8))
