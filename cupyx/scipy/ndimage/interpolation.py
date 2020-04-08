@@ -101,11 +101,6 @@ def map_coordinates(input, coordinates, output=None, order=None,
     kern = _interp_kernels._get_map_kernel(
         input.ndim, large_int, yshape=coordinates.shape, mode=mode, cval=cval,
         order=order, integer_output=integer_output)
-    # kernel assumes C-contiguous arrays
-    if not input.flags.c_contiguous:
-        input = cupy.ascontiguousarray(input)
-    if not coordinates.flags.c_contiguous:
-        coordinates = cupy.ascontiguousarray(coordinates)
     kern(input, coordinates, ret)
     return ret
 
@@ -201,11 +196,6 @@ def affine_transform(input, matrix, offset=0.0, output_shape=None, output=None,
     output = _get_output(output, input, shape=output_shape)
     if input.dtype.kind in 'iu':
         input = input.astype(cupy.float32)
-    # kernel assumes C-contiguous arrays
-    if not input.flags.c_contiguous:
-        input = cupy.ascontiguousarray(input)
-    if not matrix.flags.c_contiguous:
-        matrix = cupy.ascontiguousarray(matrix)
 
     integer_output = output.dtype.kind in 'iu'
     large_int = max(_prod(input.shape), _prod(output_shape)) > 1 << 31
@@ -396,10 +386,6 @@ def shift(input, shift, output=None, order=None, mode='constant', cval=0.0,
         if input.dtype.kind in 'iu':
             input = input.astype(cupy.float32)
 
-        # kernel assumes C-contiguous arrays
-        if not input.flags.c_contiguous:
-            input = cupy.ascontiguousarray(input)
-
         integer_output = output.dtype.kind in 'iu'
         large_int = _prod(input.shape) > 1 << 31
         kern = _interp_kernels._get_shift_kernel(
@@ -488,10 +474,6 @@ def zoom(input, zoom, output=None, order=None, mode='constant', cval=0.0,
         output = _get_output(output, input, shape=output_shape)
         if input.dtype.kind in 'iu':
             input = input.astype(cupy.float32)
-
-        # kernel assumes C-contiguous arrays
-        if not input.flags.c_contiguous:
-            input = cupy.ascontiguousarray(input)
 
         integer_output = output.dtype.kind in 'iu'
         large_int = max(_prod(input.shape), _prod(output_shape)) > 1 << 31

@@ -136,7 +136,7 @@ class TestAffineTransform(unittest.TestCase):
     @testing.numpy_cupy_allclose(atol=1e-5, scipy_name='scp')
     def test_affine_transform_fortran_order(self, xp, scp, dtype):
         a = testing.shaped_random((100, 100), xp, dtype)
-        a = cupy.asfortranarray(a)
+        a = xp.asfortranarray(a)
         matrix = testing.shaped_random(self.matrix_shape, xp, dtype)
         matrix = xp.asfortranarray(matrix)
         return self._affine_transform(xp, scp, a, matrix)
