@@ -303,12 +303,11 @@ cdef class _Args:
 cdef tuple _reduce_dims(list args, tuple params, tuple shape):
     """ Remove contiguous stride to optimize CUDA kernel."""
     cdef ndarray arr
-    cdef Py_ssize_t nargs = len(args)
 
-    if len(shape) <= 1 or nargs == 0:
+    if len(shape) <= 1 or len(args) == 0:
         return shape
 
-    if nargs == 1:  # fast path for reduction
+    if len(args) == 1:  # fast path for reduction
         a = args[0]
         if (<ParameterInfo>params[0]).raw or not isinstance(a, ndarray):
             return shape
@@ -319,10 +318,10 @@ cdef tuple _reduce_dims(list args, tuple params, tuple shape):
         else:
             args[0] = arr
             return arr.shape
-    return _reduced_view_core(args, nargs, params, shape)
+    return _reduced_view_core(args, params, shape)
 
 
-cdef tuple _reduced_view_core(list args, int nargs, tuple params, tuple shape):
+cdef tuple _reduced_view_core(list args, tuple params, tuple shape):
     cdef int i, ax, last_ax, ndim
     cdef Py_ssize_t x, total_size
     cdef vector.vector[Py_ssize_t] vecshape, newshape, newstrides
@@ -332,9 +331,9 @@ cdef tuple _reduced_view_core(list args, int nargs, tuple params, tuple shape):
     cdef ndarray arr
 
     ndim = len(shape)
-    array_indexes.reserve(nargs)
-    strides_indexes.reserve(nargs)
-    for i in range(nargs):
+    array_indexes.reserve(len(args))
+    strides_indexes.reserve(len(args))
+    for i in range(len(args)):
         p = params[i]
         if not p.raw and isinstance(args[i], ndarray):
             array_indexes.push_back(i)
