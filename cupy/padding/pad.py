@@ -438,7 +438,7 @@ def pad(array, pad_width, mode='constant', **kwargs):
               axis.
           'median'
               Pads with the median value of all or part of the vector along
-              each axis. (Not Implemented)
+              each axis.
           'minimum'
               Pads with the minimum value of all or part of the vector along
               each axis.
@@ -625,7 +625,7 @@ def pad(array, pad_width, mode='constant', **kwargs):
         'linear_ramp': ['end_values'],
         'maximum': ['stat_length'],
         'mean': ['stat_length'],
-        # 'median': ['stat_length'],
+        'median': ['stat_length'],
         'minimum': ['stat_length'],
         'reflect': ['reflect_type'],
         'symmetric': ['reflect_type'],
@@ -645,7 +645,7 @@ def pad(array, pad_width, mode='constant', **kwargs):
         'maximum': cupy.max,
         'minimum': cupy.min,
         'mean': cupy.mean,
-        # 'median': cupy.median,
+        'median': cupy.median,
     }
 
     # Create array with final shape and original values

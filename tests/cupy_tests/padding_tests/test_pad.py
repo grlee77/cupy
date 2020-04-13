@@ -13,7 +13,7 @@ from cupy import testing
         'array': [numpy.arange(6).reshape([2, 3])],
         'pad_width': [1, [1, 2], [[1, 2], [3, 4]]],
         # mode 'mean' is non-exact, so it is tested in a separate class
-        'mode': ['constant', 'edge', 'linear_ramp', 'maximum',
+        'mode': ['constant', 'edge', 'linear_ramp', 'maximum', 'median',
                  'minimum', 'reflect', 'symmetric', 'wrap'],
     })
 )
