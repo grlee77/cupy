@@ -341,9 +341,15 @@ cpdef ndarray _median(
 
     if axis is None:
         part = part.ravel()
-        part.partition(kth)
+        if part.dtype.kind == 'c':
+            part.sort()
+        else:
+            part.partition(kth)
     else:
-        part.partition(kth, axis=axis)
+        if part.dtype.kind == 'c':
+            part.sort()
+        else:
+            part.partition(kth, axis=axis)
 
     if a.dtype.char == 'e':
         part = part.astype(cupy.float16)
