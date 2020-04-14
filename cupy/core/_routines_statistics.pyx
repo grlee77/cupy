@@ -1,7 +1,6 @@
 import numpy
 from numpy import nan
 
-from cupy.core import _reduction
 from cupy.core._reduction import create_reduction_func
 from cupy.core._reduction import ReductionKernel
 
@@ -351,11 +350,10 @@ cpdef ndarray _median(
         else:
             part.partition(kth, axis=axis)
 
-    if a.dtype.char == 'e':
-        part = part.astype(cupy.float16)
-
     if part.shape == ():
         return part
+    if a.dtype.char == 'e':
+        part = part.astype(cupy.float16)
     if axis is None:
         axis = 0
 
