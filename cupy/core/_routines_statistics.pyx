@@ -316,22 +316,8 @@ cpdef ndarray _median(
         ndarray a, axis, out, overwrite_input, keepdims):
 
     output_dtype = None
-    if a.dtype.char in 'b':
+    if a.dtype.char == '?':
         a = a.astype(cupy.float64)
-    elif a.dtype.char in 'e':
-        if out is None:
-            # convert the output afterwards
-            output_dtype = a.dtype
-        a = a.astype(cupy.float32)
-    elif a.dtype.kind == 'c':
-        if out is None:
-            reduce_axis, out_axis = _reduction._get_axis(axis, len(a.shape))
-            out_shape = _reduction._get_out_shape(
-                a.shape, reduce_axis, out_axis, keepdims)
-            out = cupy.empty(out_shape, dtype=a.dtype)
-        _median(a.real, axis, out.real, overwrite_input, keepdims)
-        _median(a.imag, axis, out.imag, overwrite_input, keepdims)
-        return out
 
     keep_ndim = a.ndim
 
@@ -345,7 +331,10 @@ cpdef ndarray _median(
     else:
         kth = [(sz - 1) // 2]
 
-    if overwrite_input:
+    if a.dtype.char == 'e':
+        # partition doesn't support float16, so temporarily convert to float32
+        part = a.astype(cupy.float32)
+    elif overwrite_input:
         part = a
     else:
         part = a.copy()
@@ -355,6 +344,9 @@ cpdef ndarray _median(
         part.partition(kth)
     else:
         part.partition(kth, axis=axis)
+
+    if a.dtype.char == 'e':
+        part = part.astype(cupy.float16)
 
     if part.shape == ():
         return part
@@ -374,11 +366,8 @@ cpdef ndarray _median(
         indexer[axis] = slice(index-1, index+1)
     indexer = tuple(indexer)
 
-    out = _mean(
+    return _mean(
         part[indexer], axis=axis, dtype=None, out=out, keepdims=keepdims)
-    if output_dtype is not None:
-        out = out.astype(output_dtype)
-    return out
 
 
 cdef ndarray _mean(
