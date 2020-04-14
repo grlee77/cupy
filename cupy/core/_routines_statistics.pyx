@@ -12,7 +12,6 @@ if cupy.cuda.cub_enabled:
     from cupy.cuda import cub
 
 
-
 cdef ndarray _ndarray_max(ndarray self, axis, out, dtype, keepdims):
     if cupy.cuda.cub_enabled:
         # result will be None if the reduction is not compatible with CUB
