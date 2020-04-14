@@ -1,6 +1,7 @@
 import numpy
 from numpy import nan
 
+from cupy.core import _reduction
 from cupy.core._reduction import create_reduction_func
 from cupy.core._reduction import ReductionKernel
 
@@ -313,6 +314,18 @@ cdef _nanargmax_func = create_reduction_func(
 
 cpdef ndarray _median(
         ndarray a, axis, out, overwrite_input, keepdims):
+
+    if a.dtype.char in 'be':
+        a = a.astype(cupy.float64)
+    elif a.dtype.kind == 'c':
+        if out is None:
+            reduce_axis, out_axis = _reduction._get_axis(axis, len(a.shape))
+            out_shape = _reduction._get_out_shape(
+                a.shape, reduce_axis, out_axis, keepdims)
+            out = cupy.empty(out_shape, dtype=a.dtype)
+        _median(a.real, axis, out.real, overwrite_input, keepdims)
+        _median(a.imag, axis, out.imag, overwrite_input, keepdims)
+        return out
 
     keep_ndim = a.ndim
 
