@@ -315,8 +315,14 @@ cdef _nanargmax_func = create_reduction_func(
 cpdef ndarray _median(
         ndarray a, axis, out, overwrite_input, keepdims):
 
-    if a.dtype.char in 'be':
+    output_dtype = None
+    if a.dtype.char in 'b':
         a = a.astype(cupy.float64)
+    elif a.dtype.char in 'e':
+        if out is None:
+            # convert the output afterwards
+            output_dtype = a.dtype
+        a = a.astype(cupy.float32)
     elif a.dtype.kind == 'c':
         if out is None:
             reduce_axis, out_axis = _reduction._get_axis(axis, len(a.shape))
@@ -368,8 +374,11 @@ cpdef ndarray _median(
         indexer[axis] = slice(index-1, index+1)
     indexer = tuple(indexer)
 
-    return _mean(
+    out = _mean(
         part[indexer], axis=axis, dtype=None, out=out, keepdims=keepdims)
+    if output_dtype is not None:
+        out = out.astype(output_dtype)
+    return out
 
 
 cdef ndarray _mean(
