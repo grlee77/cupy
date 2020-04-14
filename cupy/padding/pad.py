@@ -604,7 +604,9 @@ def pad(array, pad_width, mode='constant', **kwargs):
 
     if mode == 'constant':
         values = kwargs.get('constant_values', 0)
-        if isinstance(values, numbers.Number) and values == 0:
+        if isinstance(values, numbers.Number) and values == 0 and (
+                array.ndim == 1 or array.size < 4e6):
+            # faster path for 1d arrays or small n-dimensional arrays
             return _pad_simple(array, pad_width, 0)[0]
 
     if callable(mode):
@@ -670,7 +672,6 @@ def pad(array, pad_width, mode='constant', **kwargs):
     axes = range(padded.ndim)
 
     if mode == 'constant':
-        values = kwargs.get('constant_values', 0)
         values = _as_pairs(values, padded.ndim)
         for axis, width_pair, value_pair in zip(axes, pad_width, values):
             roi = _view_roi(padded, original_area_slice, axis)
