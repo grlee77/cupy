@@ -26,7 +26,7 @@ class TestPadDefault(unittest.TestCase):
         array = xp.array(self.array, dtype=dtype)
 
         if (xp.dtype(dtype).kind in ['i', 'u'] and
-                self.mode == 'linear_ramp'):
+                self.mode in ['linear_ramp', 'median']):
             # TODO: can remove this skip once cupy/cupy/#2330 is merged
             return array
 
