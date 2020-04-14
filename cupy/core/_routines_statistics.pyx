@@ -346,7 +346,7 @@ cpdef ndarray _median(
             part.partition(kth)
     else:
         if part.dtype.kind == 'c':
-            part.sort()
+            part.sort(axis=axis)
         else:
             part.partition(kth, axis=axis)
 
