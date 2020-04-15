@@ -57,8 +57,6 @@ class TestRoundHalfway(unittest.TestCase):
         else:
             a /= scale
         a /= 2
-
-        print(xp, dtype, self.decimals, a, a.round(self.decimals))
         return a.round(self.decimals)
 
     @testing.for_signed_dtypes()
@@ -72,7 +70,6 @@ class TestRoundHalfway(unittest.TestCase):
         if self.decimals < 0:
             a *= xp.array(scale, dtype=dtype)
         a >>= 1
-
         return a.round(self.decimals)
 
     @testing.for_unsigned_dtypes()
@@ -86,5 +83,4 @@ class TestRoundHalfway(unittest.TestCase):
         if self.decimals < 0:
             a *= xp.array(scale, dtype=dtype)
         a >>= 1
-
         return a.round(self.decimals)

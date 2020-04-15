@@ -1939,9 +1939,8 @@ _round_ufunc = create_ufunc(
     '''
     if (in1 < 0) {
         // TODO(okuta): Move before loop
-        long long x = pow10<long long>(-in1 - 1);
-        // TODO(okuta): Check Numpy
-        out0 = ((in0 / x + (in0 > 0 ? 5 : -5)) / 10) * x * 10;
+        long long x = pow10<long long>(-in1);
+        out0 = x * __float2ll_rn(in0 / (1.0 * x));
     } else {
         out0 = in0;
     }''', preamble=_round_preamble)
