@@ -1,9 +1,7 @@
 import numpy
 
-from cupy import array
-from cupy import empty
-from cupy import float64
-from cupy import util
+import cupy
+from cupy import core
 from cupy.creation import basic
 from cupy.creation import from_data
 from cupy.creation import ranges
@@ -94,17 +92,15 @@ def hanning(M):
     return 0.5 - 0.5 * trigonometric.cos(2.0 * numpy.pi * n / (M - 1))
 
 
-@util.memoize()
-def _kaiser_kernel():
-    input_arguments = "float32 beta, float32 alpha"
-    output_arguments = "T arr"
-    return ElementwiseKernel(input_arguments,
-                             output_arguments,
-                             """
-                             float temp = (i - alpha)/alpha;
-                             arr = cyl_bessel_i0(beta * sqrt(1-(temp * temp)));
-                             arr /= cyl_bessel_i0(beta);
-                             """)
+<<<<<<< HEAD
+_kaiser_kernel = core.ElementwiseKernel(
+    "float32 beta, float32 alpha",
+    "T arr",
+    """
+    float temp = (i - alpha) / alpha;
+    arr = cyl_bessel_i0(beta * sqrt(1 - (temp * temp)));
+    arr /= cyl_bessel_i0(beta);
+    """)
 
 
 def kaiser(M, beta):
@@ -121,10 +117,10 @@ def kaiser(M, beta):
     where :math:`I_0` is the modified zeroth-order Bessel function.
 
      Args:
-        M (:class:`~int`):
+        M (int):
             Number of points in the output window. If zero or less, an empty
             array is returned.
-        beta (:class:`~float`):
+        beta (float):
             Shape parameter for window
 
     Returns:
@@ -134,9 +130,9 @@ def kaiser(M, beta):
     .. seealso:: :func:`numpy.kaiser`
     """
     if M == 1:
-        return array([1.])
-    if M < 0:
-        return array([])
-    alpha = (M-1)/2.0
-    out = empty(M, dtype=float64)
-    return _kaiser_kernel()(beta, alpha, out)
+        return cupy.array([1.])
+    if M <= 0:
+        return cupy.array([])
+    alpha = (M - 1) / 2.0
+    out = cupy.empty(M, dtype=cupy.float64)
+    return _kaiser_kernel(beta, alpha, out)
