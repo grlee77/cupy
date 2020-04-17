@@ -92,7 +92,6 @@ def hanning(M):
     return 0.5 - 0.5 * trigonometric.cos(2.0 * numpy.pi * n / (M - 1))
 
 
-<<<<<<< HEAD
 _kaiser_kernel = core.ElementwiseKernel(
     "float32 beta, float32 alpha",
     "T arr",

@@ -317,8 +317,8 @@ cpdef ndarray _median(
         ndarray a, axis, out, overwrite_input, keepdims):
 
     output_dtype = None
-    if a.dtype.char == '?':
-        a = a.astype(cupy.float64)
+    # if a.dtype.char == '?':
+    #     a = a.astype(cupy.float64)
 
     keep_ndim = a.ndim
 
