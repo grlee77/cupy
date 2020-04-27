@@ -605,6 +605,15 @@ cudaPos make_cudaPos(...) {
     return pos;
 }
 
+// Surface
+cudaError_t cudaCreateSurfaceObject(...) {
+    return cudaSuccess;
+}
+
+cudaError_t cudaDestroySurfaceObject(...) {
+    return cudaSuccess;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // cuComplex.h
 ///////////////////////////////////////////////////////////////////////////////

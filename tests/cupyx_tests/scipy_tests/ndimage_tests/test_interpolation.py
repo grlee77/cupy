@@ -168,7 +168,6 @@ class TestAffineExceptions(unittest.TestCase):
         ndimage_modules = (scipy.ndimage, cupyx.scipy.ndimage)
         for (xp, ndi) in zip((numpy, cupy), ndimage_modules):
             x = xp.ones((8, 8, 8))
-            angle = 15
             with pytest.raises(RuntimeError):
                 ndi.affine_transform(x, xp.ones((3, 3, 3)))
             with pytest.raises(RuntimeError):
@@ -178,7 +177,6 @@ class TestAffineExceptions(unittest.TestCase):
         ndimage_modules = (scipy.ndimage, cupyx.scipy.ndimage)
         for (xp, ndi) in zip((numpy, cupy), ndimage_modules):
             x = xp.ones((8, 8, 8))
-            angle = 15
             with pytest.raises(RuntimeError):
                 ndi.affine_transform(x, xp.ones((0, 3)))
             with pytest.raises(RuntimeError):
@@ -187,7 +185,6 @@ class TestAffineExceptions(unittest.TestCase):
                 ndi.affine_transform(x, xp.eye(x.ndim + 2))
             with pytest.raises(RuntimeError):
                 ndi.affine_transform(x, xp.eye(x.ndim)[:, :-1])
-
 
 
 @testing.gpu
@@ -273,7 +270,8 @@ class TestRotate(unittest.TestCase):
 
 
 @testing.gpu
-@testing.with_requires('scipy')
+# Scipy older than 1.3.0 raises IndexError instead of ValueError
+@testing.with_requires('scipy>=1.3.0')
 class TestRotateExceptions(unittest.TestCase):
 
     def test_rotate_invalid_plane(self):

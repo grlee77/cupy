@@ -134,7 +134,7 @@ def _get_coord_affine(ndim):
             ops.append(
                 """
             c_{j} += mat[{m_index}] * (W)in_coord[{k}];""".format(
-                j=j, k=k, m_index=m_index))
+                    j=j, k=k, m_index=m_index))
         ops.append(
             """
             c_{j} += mat[{m_index}];""".format(
@@ -169,7 +169,7 @@ def _generate_interp_custom(coord_func, ndim, large_int, yshape, mode, cval,
     Args:
         coord_func (function): generates code to do the coordinate
             transformation. See for example, `_get_coord_shift`.
-		ndim (int): The number of dimensions.
+        ndim (int): The number of dimensions.
         large_int (bool): If true use Py_ssize_t instead of int for indexing.
         yshape (tuple): Shape of the output array.
         mode (str): Signal extension mode to use at the array boundaries
@@ -192,12 +192,12 @@ def _generate_interp_custom(coord_func, ndim, large_int, yshape, mode, cval,
     else:
         uint_t = 'unsigned int'
         int_t = 'int'
-    ops.append('{uint_t} in_coord[{ndim}];'.format(uint_t=uint_t, ndim=ndim))
 
     # determine strides for x along each axis
     for j in range(ndim):
         ops.append(
-            'const {int_t} xsize_{j} = x.shape()[{j}];'.format(int_t=int_t, j=j)
+            'const {int_t} xsize_{j} = x.shape()[{j}];'.format(
+                int_t=int_t, j=j)
         )
     ops.append('const {uint_t} sx_{j} = 1;'.format(uint_t=uint_t, j=ndim - 1))
     for j in range(ndim - 1, 0, -1):
@@ -207,20 +207,8 @@ def _generate_interp_custom(coord_func, ndim, large_int, yshape, mode, cval,
             )
         )
 
-    # determine nd coordinate in x corresponding to a given raveled coordinate,
-    # i, in y.
-    ops.append("""
-        {uint_t} idx = i;
-        {uint_t} s, t;
-        """.format(uint_t=uint_t))
-    for j in range(ndim - 1, 0, -1):
-        ops.append("""
-        s = {ysize_j};
-        t = idx / s;
-        in_coord[{j}] = idx - t * s;
-        idx = t;
-        """.format(j=j, ysize_j=yshape[j]))
-    ops.append("in_coord[0] = idx;")
+    # create in_coords array to store the unraveled indices
+    ops.append(_unravel_loop_index(yshape, uint_t))
 
     # compute the transformed (target) coordinates, c_j
     ops = ops + coord_func(ndim)
@@ -319,7 +307,7 @@ def _generate_interp_custom(coord_func, ndim, large_int, yshape, mode, cval,
     name = 'interpolate_{}_order{}_{}_{}d_y{}'.format(
         name, order, mode, ndim, "_".join(["{}".format(j) for j in yshape]),
     )
-    if int_t == 'size_t':
+    if uint_t == 'size_t':
         name += '_i64'
     return operation, name
 
@@ -400,7 +388,7 @@ def _get_zoom_kernel(ndim, large_int, yshape, mode, cval=0.0, order=1,
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
-@cupy.util.memoize()
+@cupy.util.memoize(for_each_device=True)
 def _get_affine_kernel(ndim, large_int, yshape, mode, cval=0.0, order=1,
                        integer_output=False):
     in_params = 'raw X x, raw W mat'
