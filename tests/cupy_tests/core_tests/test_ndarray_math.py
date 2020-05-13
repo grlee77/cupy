@@ -57,6 +57,10 @@ class TestRoundHalfway(unittest.TestCase):
         else:
             a /= scale
         a /= 2
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream/master
         return a.round(self.decimals)
 
     @testing.for_signed_dtypes()
@@ -70,6 +74,10 @@ class TestRoundHalfway(unittest.TestCase):
         if self.decimals < 0:
             a *= xp.array(scale, dtype=dtype)
         a >>= 1
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream/master
         return a.round(self.decimals)
 
     @testing.for_unsigned_dtypes()
@@ -83,4 +91,33 @@ class TestRoundHalfway(unittest.TestCase):
         if self.decimals < 0:
             a *= xp.array(scale, dtype=dtype)
         a >>= 1
+<<<<<<< HEAD
+=======
+
+        return a.round(self.decimals)
+
+
+@testing.parameterize(*testing.product({
+    'decimals': [-5, -4, -3, -2, -1, 0]
+}))
+class TestRoundMinMax(unittest.TestCase):
+
+    @unittest.skip('Known incompatibility: see core.pyx')
+    @testing.numpy_cupy_array_equal()
+    def _test_round_int64(self, xp):
+        a = xp.array([-2**62, 2**62], dtype=xp.int64)
+        return a.round(self.decimals)
+
+    @unittest.skip('Known incompatibility: see core.pyx')
+    @testing.numpy_cupy_array_equal()
+    def test_round_uint64(self, xp):
+        a = xp.array([2**63], dtype=xp.uint64)
+        return a.round(self.decimals)
+
+    @unittest.skip('Known incompatibility: see core.pyx')
+    @testing.for_int_dtypes(no_bool=True)
+    @testing.numpy_cupy_array_equal()
+    def test_round_minmax(self, xp, dtype):
+        a = xp.array([xp.iinfo(dtype).min, xp.iinfo(dtype).max], dtype=dtype)
+>>>>>>> upstream/master
         return a.round(self.decimals)
