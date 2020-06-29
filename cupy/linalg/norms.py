@@ -55,7 +55,9 @@ _absmin_fast = cupy.core.create_reduction_func(
     'l0_fast',
     ('?->d', 'e->e', 'f->f', 'd->d', 'F->f', 'D->d'),
     ('abs(in0)', 'min(a, b)',
-     'out0 = a', None))
+     'out0 = a', None),
+    identity='CUDART_INF',
+    preamble="#include <math_constants.h>")
 
 
 def norm(x, ord=None, axis=None, keepdims=False):
@@ -103,7 +105,7 @@ def norm(x, ord=None, axis=None, keepdims=False):
         if ord == numpy.Inf:
             return _absmax_fast(x, axis=axis, keepdims=keepdims)
         elif ord == -numpy.Inf:
-            return _absmin_fast(axis=axis, keepdims=keepdims)
+            return _absmin_fast(x, axis=axis, keepdims=keepdims)
         elif ord == 0:
             # Zero norm
             return _l0_fast(x, axis=axis, keepdims=keepdims)
