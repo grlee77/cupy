@@ -402,6 +402,25 @@ class TestFromData(unittest.TestCase):
         return xp.ascontiguousarray(a, dtype=numpy.int64)
 
     @testing.for_CF_orders()
+    @testing.for_all_dtypes('dtype')
+    @testing.for_all_dtypes('a_dtype')
+    @testing.numpy_cupy_array_equal()
+    def test_asfarray(self, xp, a_dtype, dtype, order):
+        a = testing.shaped_arange((2, 3, 4), xp, dtype=a_dtype, order=order)
+        if numpy.dtype(a_dtype).kind == 'c' and numpy.dtype(dtype).kind != 'c':
+            # case of complex to real will case a RuntimeWarning
+            with testing.assert_warns(RuntimeWarning):
+                return xp.asfarray(a, dtype=dtype)
+        return xp.asfarray(a, dtype=dtype)
+
+    @testing.for_all_dtypes('dtype', no_complex=True)
+    @testing.for_all_dtypes('a_dtype', no_complex=True)
+    @testing.numpy_cupy_array_equal()
+    def test_asfarray_cuda_array_zero_dim_dtype(self, xp, a_dtype, dtype):
+        a = xp.ones((), dtype=a_dtype)
+        return xp.asfarray(a, dtype)
+
+    @testing.for_CF_orders()
     @testing.for_all_dtypes()
     @testing.numpy_cupy_array_equal()
     def test_copy(self, xp, dtype, order):

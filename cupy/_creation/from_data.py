@@ -66,6 +66,25 @@ def asarray(a, dtype=None, order=None):
     return core.array(a, dtype, False, order)
 
 
+def asfarray(a, dtype=numpy.float64):
+    """Return an array converted to a float type.
+
+    Args:
+        a: :class:`cupy.ndarray` object or any other object that can be
+            passed to :func:`numpy.array`.
+        dtype (str or dtype object, optional): The float type code to coerce
+            input array ``a``.  If ``dtype`` is one of the 'int' dtypes, it is
+            replaced with float64.
+
+    Returns:
+        cupy.ndarray: The input ``a`` as a float ndarray.
+
+    """
+    if not numpy.issubdtype(dtype, numpy.inexact):
+        dtype = numpy.float64
+    return asarray(a, dtype=dtype)
+
+
 def asanyarray(a, dtype=None, order=None):
     """Converts an object to array.
 
