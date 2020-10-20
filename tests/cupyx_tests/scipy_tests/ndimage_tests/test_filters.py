@@ -72,6 +72,8 @@ class FilterTestCaseBase(unittest.TestCase):
         arr = testing.shaped_random(self.shape, xp, self.dtype)
         if self.order == 'F':
             arr = xp.asfortranarray(arr)
+        elif self.order == 'neg_stride':
+            arr = arr[::-1, ...]
 
         # The weights we are using to filter
         wghts = self._get_weights(xp)
@@ -478,6 +480,32 @@ class TestShellSort(FilterTestCaseBase):
 @testing.gpu
 @testing.with_requires('scipy')
 class TestFortranOrder(FilterTestCaseBase):
+    @testing.numpy_cupy_allclose(atol=1e-5, rtol=1e-5, scipy_name='scp')
+    def test_filter(self, xp, scp):
+        return self._filter(xp, scp)
+
+
+# Tests with input array with negative stride
+@testing.parameterize(*(
+    testing.product([
+        testing.product({
+            'filter': ['convolve', 'correlate',
+                       'minimum_filter', 'maximum_filter'],
+        }) + testing.product({
+            'filter': ['convolve1d', 'correlate1d',
+                       'minimum_filter1d', 'maximum_filter1d'],
+            'axis': [0, 1, -1],
+        }),
+        testing.product({
+            **COMMON_PARAMS,
+            'shape': [(4, 5), (3, 4, 5)],
+            'order': ['neg_stride'],
+        })
+    ])
+))
+@testing.gpu
+@testing.with_requires('scipy')
+class TestNegativeStride(FilterTestCaseBase):
     @testing.numpy_cupy_allclose(atol=1e-5, rtol=1e-5, scipy_name='scp')
     def test_filter(self, xp, scp):
         return self._filter(xp, scp)

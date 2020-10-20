@@ -396,7 +396,8 @@ class BinaryErosionAndDilationContiguity(unittest.TestCase):
         'x_dtype': [numpy.int8, numpy.int16, numpy.int32,
                     numpy.float32, numpy.float64],
         'output': [None, numpy.int32, numpy.float64],
-        'filter': ['grey_erosion', 'grey_dilation']
+        'filter': ['grey_erosion', 'grey_dilation'],
+        'contiguity': ['C']
     }) + testing.product({
         'shape': [(3, 4), (2, 3, 4), (1, 2, 3, 4)],
         'size': [3, 4],
@@ -407,7 +408,8 @@ class BinaryErosionAndDilationContiguity(unittest.TestCase):
         'origin': [0],
         'x_dtype': [numpy.int32, numpy.float64],
         'output': [None],
-        'filter': ['grey_erosion', 'grey_dilation']
+        'filter': ['grey_erosion', 'grey_dilation'],
+        'contiguity': ['C']
     }) + testing.product({
         'shape': [(3, 4), (2, 3, 4), (1, 2, 3, 4)],
         'size': [3, 4],
@@ -418,7 +420,20 @@ class BinaryErosionAndDilationContiguity(unittest.TestCase):
         'origin': [0],
         'x_dtype': [numpy.int32, numpy.float64],
         'output': [None],
-        'filter': ['grey_erosion', 'grey_dilation']
+        'filter': ['grey_erosion', 'grey_dilation'],
+        'contiguity': ['C']
+    }) + testing.product({
+        'shape': [(8, 16)],
+        'size': [3, 4],
+        'footprint': [None, 'random'],
+        'structure': [None, 'random'],
+        'mode': ['nearest'],
+        'cval': [0.0],
+        'origin': [0],
+        'x_dtype': [numpy.float64],
+        'output': [None],
+        'filter': ['grey_erosion', 'grey_dilation'],
+        'contiguity': ['C', 'F', 'none', 'neg_stride']
     })
 ))
 @testing.gpu
@@ -444,6 +459,12 @@ class TestGreyErosionAndDilation(unittest.TestCase):
         else:
             shape = (self.size, ) * x.ndim
             structure = testing.shaped_random(shape, xp, dtype=xp.int32)
+        if self.contiguity == 'F':
+            x = xp.asfortranarray(x)
+        elif self.contiguity == 'none':
+            x = x[:, ::2]
+        elif self.contiguity == 'neg_stride':
+            x = x[::-1, :]
         return filter(x, size=self.size, footprint=footprint,
                       structure=structure, output=self.output,
                       mode=self.mode, cval=self.cval, origin=origin)
@@ -465,7 +486,7 @@ class TestGreyErosionAndDilation(unittest.TestCase):
     'origin': [0, None],
     'x_dtype': [numpy.int32, numpy.float32],
     'output': [None, numpy.float64],
-    'filter': ['grey_closing', 'grey_opening']
+    'filter': ['grey_closing', 'grey_opening'],
 }))
 @testing.gpu
 @testing.with_requires('scipy')
