@@ -355,7 +355,7 @@ class BinaryErosionAndDilation(unittest.TestCase):
         'shape': [(16, 24)],
         'filter': ['binary_erosion', 'binary_dilation'],
         'iterations': [1, 2],
-        'contiguity': ['C', 'F', 'none']}
+        'contiguity': ['C', 'F', 'none', 'neg_stride', 'neg_stride2']}
     ))
 )
 @testing.gpu
@@ -364,7 +364,7 @@ class BinaryErosionAndDilationContiguity(unittest.TestCase):
     def _filter(self, xp, scp, x):
         filter = getattr(scp.ndimage, self.filter)
         ndim = len(self.shape)
-        structure = scp.ndimage.generate_binary_structure(ndim, 1)
+        structure = scp.ndimage.generate_binary_structure(ndim, 2)
         return filter(x, structure, iterations=self.iterations, mask=None,
                       output=None, border_value=0, origin=0, brute_force=True)
 
@@ -377,6 +377,10 @@ class BinaryErosionAndDilationContiguity(unittest.TestCase):
             x = xp.asfortranarray(x)
         elif self.contiguity == 'none':
             x = x[::2, ::3]
+        elif self.contiguity == 'neg_stride':
+            x = x[::-1, :]
+        elif self.contiguity == 'neg_stride2':
+            x = x[:, ::-1]
         return self._filter(xp, scp, x)
 
 

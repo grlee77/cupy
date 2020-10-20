@@ -158,6 +158,8 @@ def _binary_erosion(input, structure, iterations, mask, output, border_value,
 
     if input.dtype.kind == 'c':
         raise TypeError('Complex type not supported')
+    if any(s < 0 for s in input.strides):
+        input = cupy.ascontiguousarray(input)
     if structure is None:
         structure = generate_binary_structure(input.ndim, 1)
         all_weights_nonzero = input.ndim == 1
