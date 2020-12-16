@@ -594,9 +594,9 @@ class TestWeightComplexDtype(FilterTestCaseBase):
             pytest.skip("non-complex")
 
     def _get_array_and_weights(self, xp):
-            arr = testing.shaped_random(self.shape, xp, self.dtype)
-            weights = self._get_weights(xp)
-            return arr, weights
+        arr = testing.shaped_random(self.shape, xp, self.dtype)
+        weights = self._get_weights(xp)
+        return arr, weights
 
     @testing.numpy_cupy_allclose(atol=1e-5, rtol=1e-5, scipy_name='scp')
     @testing.with_requires('scipy>=1.6.0')

@@ -438,7 +438,6 @@ class TestShift:
         a = testing.shaped_random((100, 100), xp, dtype)
         return self._shift(xp, scp, a)
 
-
     @testing.for_complex_dtypes()
     @testing.numpy_cupy_allclose(atol=1e-5, scipy_name='scp')
     @testing.with_requires('scipy>=1.6.0')
