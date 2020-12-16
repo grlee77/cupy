@@ -316,7 +316,9 @@ class TestFilterFast(FilterTestCaseBase):
 @testing.gpu
 @testing.with_requires('scipy')
 class TestFilterComplexFast(FilterTestCaseBase):
+
     @testing.numpy_cupy_allclose(atol=1e-5, rtol=1e-5, scipy_name='scp')
+    @testing.with_requires('scipy>=1.6.0')
     def test_filter(self, xp, scp):
         return self._filter(xp, scp)
 
@@ -597,10 +599,12 @@ class TestWeightComplexDtype(FilterTestCaseBase):
             return arr, weights
 
     @testing.numpy_cupy_allclose(atol=1e-5, rtol=1e-5, scipy_name='scp')
+    @testing.with_requires('scipy>=1.6.0')
     def test_filter_complex(self, xp, scp):
         self._skip_noncomplex()
         return self._filter(xp, scp)
 
+    @testing.with_requires('scipy>=1.6.0')
     def test_filter_complex_output_dtype_error(self):
         # raises RuntimeError if provided a real-valued output array
         self._skip_noncomplex()
@@ -612,6 +616,7 @@ class TestWeightComplexDtype(FilterTestCaseBase):
                 func(arr, weights, output=output)
         return
 
+    @testing.with_requires('scipy>=1.6.0')
     def test_filter_complex_output_dtype_warns(self):
         # warns if a real-valued dtype is specified for the output
         self._skip_noncomplex()
