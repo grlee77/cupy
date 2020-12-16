@@ -1,6 +1,9 @@
 import warnings
 
+import numpy
+
 import cupy
+
 
 
 def _is_integer_output(output, input):
@@ -40,7 +43,7 @@ def _get_output(output, input, shape=None, complex_output=False):
             output = cupy.promote_types(output, cupy.complex64)
         output = cupy.zeros(shape, dtype=output)
     elif isinstance(output, str):
-        output = cupy.typeDict[output]
+        output = numpy.typeDict[output]
         if complex_output and cupy.dtype(output).kind != 'c':
             raise RuntimeError("output must have complex dtype")
         output = cupy.zeros(shape, dtype=output)
