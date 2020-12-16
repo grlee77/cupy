@@ -306,8 +306,7 @@ def map_coordinates(input, coordinates, output=None, order=None,
     large_int = max(_prod(input.shape), coordinates.shape[0]) > 1 << 31
     kern = _interp_kernels._get_map_kernel(
         input.ndim, large_int, yshape=coordinates.shape, mode=mode, cval=cval,
-        order=order, integer_output=integer_output, nprepad=nprepad,
-        real_output=ret.dtype.kind != 'c')
+        order=order, integer_output=integer_output, nprepad=nprepad)
     kern(filtered, coordinates, ret)
     return ret
 
@@ -424,14 +423,12 @@ def affine_transform(input, matrix, offset=0.0, output_shape=None, output=None,
         offset = -offset / matrix
         kern = _interp_kernels._get_zoom_shift_kernel(
             ndim, large_int, output_shape, mode, cval=cval, order=order,
-            integer_output=integer_output, nprepad=nprepad,
-            real_output=output.dtype.kind != 'c')
+            integer_output=integer_output, nprepad=nprepad)
         kern(filtered, offset, matrix, output)
     else:
         kern = _interp_kernels._get_affine_kernel(
             ndim, large_int, output_shape, mode, cval=cval, order=order,
-            integer_output=integer_output, nprepad=nprepad,
-            real_output=output.dtype.kind != 'c')
+            integer_output=integer_output, nprepad=nprepad)
         m = cupy.zeros((ndim, ndim + 1), dtype=cupy.float64)
         m[:, :-1] = matrix
         m[:, -1] = cupy.asarray(offset, dtype=cupy.float64)
@@ -613,8 +610,7 @@ def shift(input, shift, output=None, order=None, mode='constant', cval=0.0,
         large_int = _prod(input.shape) > 1 << 31
         kern = _interp_kernels._get_shift_kernel(
             input.ndim, large_int, input.shape, mode, cval=cval, order=order,
-            integer_output=integer_output, nprepad=nprepad,
-            real_output=output.dtype.kind != 'c')
+            integer_output=integer_output, nprepad=nprepad)
         shift = cupy.asarray(shift, dtype=cupy.float64, order='C')
         if shift.ndim != 1:
             raise ValueError('shift must be 1d')
@@ -740,7 +736,7 @@ def zoom(input, zoom, output=None, order=None, mode='constant', cval=0.0,
         kern = _interp_kernels._get_zoom_kernel(
             input.ndim, large_int, output_shape, mode, order=order,
             integer_output=integer_output, grid_mode=grid_mode,
-            nprepad=nprepad, real_output=output.dtype.kind != 'c')
+            nprepad=nprepad)
         zoom = cupy.asarray(zoom, dtype=cupy.float64)
         kern(filtered, zoom, output)
     return output
