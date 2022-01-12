@@ -3,7 +3,7 @@
 The source code here is an adaptation with minimal changes from the following
 files in SciPy's bundled Cephes library:
 
-https://github.com/scipy/scipy/blob/master/scipy/special/cephes/beta.c
+https://github.com/scipy/scipy/blob/main/scipy/special/cephes/beta.c
 
 Cephes Math Library, Release 2.3:  March, 1995
 Copyright 1984, 1995 by Stephen L. Moshier
@@ -13,21 +13,6 @@ from cupy import _core
 from cupyx.scipy.special._digamma import polevl_definition
 from cupyx.scipy.special._gamma import gamma_implementation
 from cupyx.scipy.special._gammainc import p1evl_definition
-
-
-"""
-    "beta": {
-        "cephes.h": {
-            "beta": "dd->d"
-        }
-    },
-    "betaln": {
-        "cephes.h": {
-            "lbeta": "dd->d"
-        }
-    },
-"""
-#include "mconf.h"
 
 
 misc_preamble = """
@@ -436,9 +421,9 @@ beta = _core.create_ufunc(
 
     Parameters
     ----------
-    a, b : array-like
+    a, b : cupy.ndarray
         Real-valued arguments
-    out : ndarray, optional
+    out : cupy.ndarray, optional
         Optional output array for the function result
 
     Returns
@@ -463,17 +448,17 @@ betaln = _core.create_ufunc(
 
     Parameters
     ----------
-    a, b : array-like
+    a, b : cupy.ndarray
         Real-valued arguments
-    out : ndarray, optional
+    out : cupy.ndarray, optional
         Optional output array for the function result
 
     Returns
     -------
     scalar or ndarray
-        Value of the beta function
+        Value of the natural log of the magnitude of beta.
 
-    .. seealso:: :meth:`scipy.special.beta`
+    .. seealso:: :meth:`scipy.special.betaln`
 
     """,
 )
