@@ -1,4 +1,6 @@
-"""Beta and log beta functions.
+"""Beta and log(abs(beta)) functions.
+
+Also the incomplete beta function and its inverse.
 
 The source code here is an adaptation with minimal changes from the following
 files in SciPy's bundled Cephes library:
@@ -18,7 +20,7 @@ from cupyx.scipy.special._gammainc import p1evl_definition
 from cupyx.scipy.special._ndtri import ndtri_definition
 
 
-misc_preamble = """
+beta_preamble = """
 // include for CUDART_INF, CUDART_NAN
 #include <cupy/math_constants.h>
 
@@ -198,7 +200,7 @@ __device__ static double lbeta_asymp(double a, double b, int *sgn)
 """
 
 
-beta_implementation = """
+beta_definition = """
 
 __device__ double beta(double, double);
 
@@ -301,7 +303,7 @@ __device__ double beta(double a, double b)
 """
 
 
-lbeta_implementation = """
+lbeta_definition = """
 
 __device__ double lbeta(double, double);
 
@@ -410,13 +412,13 @@ beta = _core.create_ufunc(
     ("ff->f", "dd->d"),
     "out0 = out0_type(beta(in0, in1));",
     preamble=(
-        misc_preamble +
+        beta_preamble +
         gamma_definition +
         polevl_definition +
         p1evl_definition +
         lgam_sgn_definition +
         lbeta_symp_definition +
-        beta_implementation
+        beta_definition
     ),
     doc="""Beta function.
 
@@ -443,13 +445,13 @@ betaln = _core.create_ufunc(
     ("ff->f", "dd->d"),
     "out0 = out0_type(lbeta(in0, in1));",
     preamble=(
-        misc_preamble +
+        beta_preamble +
         gamma_definition +
         polevl_definition +
         p1evl_definition +
         lgam_sgn_definition +
         lbeta_symp_definition +
-        lbeta_implementation
+        lbeta_definition
     ),
     doc="""Natural logarithm of absolute value of beta function.
 
@@ -473,7 +475,7 @@ betaln = _core.create_ufunc(
 )
 
 
-incbet_implementation = """
+incbet_definition = """
 
 __device__ static double incbd(double, double, double);
 __device__ static double incbcf(double, double, double);
@@ -801,15 +803,15 @@ betainc = _core.create_ufunc(
     ("fff->f", "ddd->d"),
     "out0 = out0_type(incbet(in0, in1, in2));",
     preamble=(
-        misc_preamble +
+        beta_preamble +
         gamma_definition +
         polevl_definition +
         p1evl_definition +
         lgam_sgn_definition +
         lbeta_symp_definition +
-        beta_implementation +
-        lbeta_implementation +
-        incbet_implementation
+        beta_definition +
+        lbeta_definition +
+        incbet_definition
     ),
     doc="""Incomplete beta function.
 
@@ -833,7 +835,7 @@ betainc = _core.create_ufunc(
 )
 
 
-incbi_implementation = """
+incbi_definition = """
 
 __device__ double incbi(double aa, double bb, double yy0)
 {
@@ -1077,17 +1079,17 @@ betaincinv = _core.create_ufunc(
     ("fff->f", "ddd->d"),
     "out0 = out0_type(incbi(in0, in1, in2));",
     preamble=(
-        misc_preamble +
+        beta_preamble +
         gamma_definition +
         polevl_definition +
         p1evl_definition +
         ndtri_definition +
         lgam_sgn_definition +
         lbeta_symp_definition +
-        beta_implementation +
-        lbeta_implementation +
-        incbet_implementation +
-        incbi_implementation
+        beta_definition +
+        lbeta_definition +
+        incbet_definition +
+        incbi_definition
     ),
 
     doc="""Inverse of the incomplete beta function.
