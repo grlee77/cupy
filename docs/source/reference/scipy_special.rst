@@ -28,6 +28,9 @@ Raw statistical functions
 .. autosummary::
    :toctree: generated/
 
+   chdtr
+   chdtrc
+   chdtri
    ndtr
    ndtri
    logit
