@@ -27,7 +27,11 @@ Raw statistical functions
 .. autosummary::
    :toctree: generated/
 
+   fdtr
+   fdtrc
+   fdtri
    ndtr
+   ndtri
 
 
 Information Theory functions

@@ -7,6 +7,9 @@ from cupyx.scipy.special._bessel import y0  # NOQA
 from cupyx.scipy.special._bessel import y1  # NOQA
 
 # Raw statistical functions
+from cupyx.scipy.special._fdtr import fdtr  # NOQA
+from cupyx.scipy.special._fdtr import fdtrc  # NOQA
+from cupyx.scipy.special._fdtr import fdtri  # NOQA
 from cupyx.scipy.special._statistics import ndtr  # NOQA
 from cupyx.scipy.special._ndtri import ndtri  # NOQA
 
