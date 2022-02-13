@@ -56,6 +56,8 @@ from cupyx.scipy.special._lpmv import lpmv  # NOQA
 from cupyx.scipy.special._sph_harm import sph_harm  # NOQA
 
 # Other special functions
+from cupyx.scipy.special._logsumexp import softmax  # NOQA
+from cupyx.scipy.special._logsumexp import log_softmax  # NOQA
 from cupyx.scipy.special._zeta import zeta  # NOQA
 
 # Convenience functions
@@ -72,4 +74,5 @@ from cupyx.scipy.special._basic import expm1  # NOQA
 from cupy import round  # NOQA
 from cupyx.scipy.special._xlogy import xlogy  # NOQA
 from cupyx.scipy.special._xlogy import xlog1py  # NOQA
+from cupyx.scipy.special._logsumexp import logsumexp  # NOQA
 from cupy import sinc  # NOQA

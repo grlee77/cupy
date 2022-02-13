@@ -49,8 +49,11 @@ def logsumexp(a, axis=None, b=None, keepdims=False, return_sign=False):
     if b is not None:
         b = cupy.broadcast_to(b, a.shape)
         # set to -inf at any locations where b is 0
-        a = a.astype(cupy.promote_types(a, float), copy=False)
-        a[b == 0] = -cupy.inf
+        b_zero_mask = b == 0
+        if a.real.dtype.kind != 'f' and cupy.any(b_zero_mask):
+            # convert to float in same manner as SciPy
+            a = a + 0.
+        a[b_zero_mask] = -cupy.inf
 
     a_max = cupy.amax(a, axis=axis, keepdims=True)
 
@@ -60,11 +63,12 @@ def logsumexp(a, axis=None, b=None, keepdims=False, return_sign=False):
         a_max_is_zero = False
     elif not cupy.isfinite(a_max):
         a_max_is_zero = True
-        out = a.copy()
+        out = a
 
-    cupy.exp(out, out=out)
+    out = cupy.exp(out)
     if b is not None:
-        out *= b
+        # not *= b to keep the same dtype behavior as SciPy
+        out = b * out
     out = cupy.sum(out, axis=axis, keepdims=keepdims)
     if return_sign:
         sgn = cupy.sign(out)
