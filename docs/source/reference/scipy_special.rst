@@ -103,6 +103,8 @@ Other special functions
 .. autosummary::
    :toctree: generated/
 
+   softmax
+   log_softmax
    zeta
 
 
@@ -125,4 +127,5 @@ Convenience functions
    round
    xlogy
    xlog1py
+   logsumexp
    sinc
