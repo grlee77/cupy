@@ -120,8 +120,8 @@ def softmax(x, axis=None):
 
     """
     # compute in log space for numerical stability
-    out = cupy.exp(x)
-    out -= logsumexp(x, axis=axis, keepdims=True)
+    out = x - logsumexp(x, axis=axis, keepdims=True)
+    cupy.exp(out, out=out)
     return out
 
 
@@ -164,5 +164,8 @@ def log_softmax(x, axis=None):
     exp_tmp = cupy.exp(out)
     s = cupy.sum(exp_tmp, axis=axis, keepdims=True)
     cupy.log(s, out=s)
-    out -= s
+    if out.real.dtype != 'f':
+        out = out - s
+    else:
+        out -= s
     return out
