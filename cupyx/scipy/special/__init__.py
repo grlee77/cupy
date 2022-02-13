@@ -55,7 +55,14 @@ from cupyx.scipy.special._erf import erfcinv  # NOQA
 from cupyx.scipy.special._lpmv import lpmv  # NOQA
 from cupyx.scipy.special._sph_harm import sph_harm  # NOQA
 
+# Combinatorics
+from cupyx.scipy.special._basic import comb  # NOQA
+from cupyx.scipy.special._basic import perm  # NOQA
+
 # Other special functions
+from cupyx.scipy.special._basic import binom  # NOQA
+from cupyx.scipy.special._basic import factorial  # NOQA
+from cupyx.scipy.special._basic import factorial2  # NOQA
 from cupyx.scipy.special._zeta import zeta  # NOQA
 
 # Convenience functions

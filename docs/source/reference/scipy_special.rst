@@ -97,12 +97,25 @@ Legendre functions
    sph_harm
 
 
+Combinatorics
+-----------------------
+
+.. autosummary::
+   :toctree: generated/
+
+   comb
+   perm
+
+
 Other special functions
 -----------------------
 
 .. autosummary::
    :toctree: generated/
 
+   binom
+   factorial
+   factorial2
    zeta
 
 

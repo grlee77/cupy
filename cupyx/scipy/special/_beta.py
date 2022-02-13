@@ -387,20 +387,21 @@ __noinline__ __device__ double lbeta(double a, double b)
 }
 """
 
+common_beta_preamble = (
+    beta_preamble +
+    gamma_definition +
+    polevl_definition +
+    p1evl_definition +
+    lgam_sgn_definition +
+    lbeta_symp_definition
+)
+
 
 beta = _core.create_ufunc(
     "cupyx_scipy_beta",
     ("ff->f", "dd->d"),
     "out0 = out0_type(beta(in0, in1));",
-    preamble=(
-        beta_preamble +
-        gamma_definition +
-        polevl_definition +
-        p1evl_definition +
-        lgam_sgn_definition +
-        lbeta_symp_definition +
-        beta_definition
-    ),
+    preamble=common_beta_preamble + beta_definition,
     doc="""Beta function.
 
     Parameters
@@ -427,15 +428,7 @@ betaln = _core.create_ufunc(
     "cupyx_scipy_betaln",
     ("ff->f", "dd->d"),
     "out0 = out0_type(lbeta(in0, in1));",
-    preamble=(
-        beta_preamble +
-        gamma_definition +
-        polevl_definition +
-        p1evl_definition +
-        lgam_sgn_definition +
-        lbeta_symp_definition +
-        lbeta_definition
-    ),
+    preamble=common_beta_preamble + lbeta_definition,
     doc="""Natural logarithm of absolute value of beta function.
 
     Computes ``ln(abs(beta(a, b)))``.
