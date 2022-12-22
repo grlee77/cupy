@@ -1,4 +1,3 @@
-import unittest
 import warnings
 
 import numpy
@@ -10,20 +9,34 @@ from cupy import testing
 
 @testing.parameterize(
     *testing.product({
-        'array': [numpy.arange(6).reshape([2, 3])],
-        'pad_width': [1, [1, 2], [[1, 2], [3, 4]]],
+        'array': [numpy.arange(4),
+                  numpy.arange(3 * 4).reshape([3, 4]),
+                  numpy.arange(2 * 3 * 4).reshape([2, 3, 4])],
+        'pad_width': ['scalar', 'pair', 'per_axis_pair'],
         # mode 'mean' is non-exact, so it is tested in a separate class
         'mode': ['constant', 'edge', 'linear_ramp', 'maximum',
                  'minimum', 'reflect', 'symmetric', 'wrap'],
+        'contiguous': ['C', 'F', None]
     })
 )
 @testing.gpu
-class TestPadDefault(unittest.TestCase):
+class TestPadDefault:
 
     @testing.for_all_dtypes(no_bool=True)
     @testing.numpy_cupy_array_equal()
     def test_pad_default(self, xp, dtype):
         array = xp.array(self.array, dtype=dtype)
+        if self.pad_width == 'scalar':
+            pad_width = 1
+        elif self.pad_width == 'pair':
+            pad_width = [1, 2]
+        elif self.pad_width == 'per_axis_pair':
+            pad_width = [(ax + 1, ax + 2) for ax in range(array.ndim)]
+        if self.contiguous is None:
+            # skip elements to get a non-contiguous view
+            array = array[..., ::2]
+        elif self.contiguous == 'F':
+            array = xp.asfortranarray(array)
 
         if (xp.dtype(dtype).kind in ['i', 'u'] and
                 self.mode == 'linear_ramp'):
@@ -32,14 +45,20 @@ class TestPadDefault(unittest.TestCase):
 
         # Older version of NumPy(<1.12) can emit ComplexWarning
         def f():
-            return xp.pad(array, self.pad_width, mode=self.mode)
+            return xp.pad(array, pad_width, mode=self.mode)
 
         if xp is numpy:
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore', numpy.ComplexWarning)
-                return f()
+                output = f()
         else:
-            return f()
+            output = f()
+        # check memory layout of the output
+        if self.contiguous == 'F':
+            assert output.flags.f_contiguous
+        else:
+            assert output.flags.c_contiguous
+        return output
 
 
 @testing.parameterize(
@@ -49,7 +68,7 @@ class TestPadDefault(unittest.TestCase):
     })
 )
 @testing.gpu
-class TestPadDefaultMean(unittest.TestCase):
+class TestPadDefaultMean:
 
     @testing.for_all_dtypes(no_bool=True)
     @testing.numpy_cupy_array_almost_equal(decimal=5)
@@ -123,7 +142,7 @@ class TestPadDefaultMean(unittest.TestCase):
 )
 @testing.gpu
 # Old numpy does not work with multi-dimensional constant_values
-class TestPad(unittest.TestCase):
+class TestPad:
 
     @testing.for_all_dtypes(no_bool=True)
     @testing.numpy_cupy_array_equal()
@@ -165,7 +184,7 @@ class TestPad(unittest.TestCase):
 )
 @testing.gpu
 # Old numpy does not work with multi-dimensional constant_values
-class TestPadMean(unittest.TestCase):
+class TestPadMean:
 
     @testing.for_all_dtypes(no_bool=True)
     @testing.numpy_cupy_array_almost_equal(decimal=5)
@@ -190,7 +209,7 @@ class TestPadMean(unittest.TestCase):
 
 
 @testing.gpu
-class TestPadNumpybug(unittest.TestCase):
+class TestPadNumpybug:
 
     @testing.for_all_dtypes(no_bool=True, no_complex=True)
     @testing.numpy_cupy_array_equal()
@@ -204,7 +223,7 @@ class TestPadNumpybug(unittest.TestCase):
 
 
 @testing.gpu
-class TestPadEmpty(unittest.TestCase):
+class TestPadEmpty:
 
     @testing.with_requires('numpy>=1.17')
     @testing.for_all_dtypes(no_bool=True)
@@ -218,7 +237,7 @@ class TestPadEmpty(unittest.TestCase):
 
 
 @testing.gpu
-class TestPadCustomFunction(unittest.TestCase):
+class TestPadCustomFunction:
 
     @testing.for_all_dtypes(no_bool=True)
     @testing.numpy_cupy_array_equal()
@@ -249,7 +268,7 @@ class TestPadCustomFunction(unittest.TestCase):
     {'array': [0, 1, 2, 3], 'pad_width': [1, 2], 'mode': 'reflect'},
 )
 @testing.gpu
-class TestPadSpecial(unittest.TestCase):
+class TestPadSpecial:
 
     @testing.numpy_cupy_array_equal()
     def test_pad_special(self, xp):
@@ -291,7 +310,7 @@ class TestPadSpecial(unittest.TestCase):
 )
 @testing.gpu
 @testing.with_requires('numpy>=1.17')
-class TestPadValueError(unittest.TestCase):
+class TestPadValueError:
 
     def test_pad_failure(self):
         for xp in (numpy, cupy):
@@ -311,7 +330,7 @@ class TestPadValueError(unittest.TestCase):
      'kwargs': {}},
 )
 @testing.gpu
-class TestPadTypeError(unittest.TestCase):
+class TestPadTypeError:
 
     def test_pad_failure(self):
         for xp in (numpy, cupy):

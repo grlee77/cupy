@@ -39,7 +39,9 @@ def _pad_boundary_ops(mode, var_name, size, int_t="int"):
     return ops + "\n"
 
 
-def _generate_size_vars(ndim, arr_name='arr', size_prefix='size', int_type='int', order='C'):
+def _generate_size_vars(
+    ndim, arr_name='arr', size_prefix='size', int_type='int'
+):
     """Store shape of a raw array into individual variables.
 
     Examples
@@ -49,11 +51,8 @@ def _generate_size_vars(ndim, arr_name='arr', size_prefix='size', int_type='int'
     int size_1 = arr.shape()[1];
     int size_2 = arr.shape()[2];
     """
-    # TODO: This seems like a CuPy bug that shape() indices have to be reversed
-    #       for the order='F' case!
-    shape_range = range(ndim) if order=='C' else range(ndim - 1, -1, -1)
-    set_size_vars = [f'{int_type} {size_prefix}_{i} = {arr_name}.shape()[{j}];'
-                     for i, j in enumerate(shape_range)]
+    set_size_vars = [f'{int_type} {size_prefix}_{i} = {arr_name}.shape()[{i}];'
+                     for i in range(ndim)]
     return '\n'.join(set_size_vars) + '\n'
 
 
@@ -66,7 +65,7 @@ def _generate_indices_ops(
 
     Examples
     --------
-    >>> print(_generate_indices_ops(3, 'size', 'int', 'ind'))
+    >>> print(_generate_indices_ops(3, 'size', 'int', 'ind', 'C'))
     int _i = i;
     int ind_2 = _i % size_2; _i /= size_2;
     int ind_1 = _i % size_1; _i /= size_1;
@@ -90,7 +89,7 @@ def _gen_raveled(ndim, shape_prefix='shape', index_prefix='i', order='C'):
     """Generate raveled index for c-ordered memory layout
 
     For index_prefix='i', the indices are (i_0, i_1, ....)
-    For shape_prefix='i', the shape is (shape_0, shape_1, ....)
+    For shape_prefix='shape', the shape is (shape_0, shape_1, ....)
     """
     if ndim == 1:
         return f'{index_prefix}_0';
@@ -109,54 +108,72 @@ def _gen_raveled(ndim, shape_prefix='shape', index_prefix='i', order='C'):
 
 
 @cupy._util.memoize(for_each_device=True)
-def _get_pad_kernel(ndim=3, int_type='int', mode='edge', cval=0.0, order='C'):
+def _get_pad_kernel(ndim=3, int_type='int', mode='edge', order='C'):
     # variables storing shape of the output array
     out_size_prefix = 'shape'
-    operation = _generate_size_vars(ndim, arr_name='out', size_prefix=out_size_prefix, int_type=int_type, order=order)
+    operation = _generate_size_vars(
+        ndim, arr_name='out', size_prefix=out_size_prefix, int_type=int_type
+    )
 
     # variables storing shape of the input array
     in_size_prefix = 'ishape'
-    operation += _generate_size_vars(ndim, arr_name='arr', size_prefix=in_size_prefix, int_type=int_type, order=order)
+    operation += _generate_size_vars(
+        ndim, arr_name='arr', size_prefix=in_size_prefix, int_type=int_type
+    )
 
     # unraveled indices into the output array
     out_index_prefix = 'oi'
-    operation += _generate_indices_ops(ndim, size_prefix=out_size_prefix, int_type=int_type, index_prefix=out_index_prefix, order=order)
+    operation += _generate_indices_ops(
+        ndim, size_prefix=out_size_prefix, int_type=int_type,
+        index_prefix=out_index_prefix, order=order
+    )
 
     # compute unraveled indices into the input array
     # (i_0, i_1, ...)
     in_index_prefix = 'i'
-    operation += '\n'.join([f'{int_type} {in_index_prefix}_{j} = {out_index_prefix}_{j} - pad_widths[{2*j}];' for j in range(ndim)])
+    operation += '\n'.join([f'{int_type} {in_index_prefix}_{j} = {out_index_prefix}_{j} - pad_widths[{2*j}];'  # noqa
+                           for j in range(ndim)])
     operation += '\n'
     input_indices = tuple(f'{in_index_prefix}_{j}' for j in range(ndim))
 
     # impose boundary condition
+
     if mode == "constant":
-        for i, coord in enumerate(input_indices):
-            operation += _pad_boundary_ops(mode, coord, f"{in_size_prefix}_{i}", int_type)
+        for j, coord in enumerate(input_indices):
+            operation += _pad_boundary_ops(
+                mode, coord, f"{in_size_prefix}_{j}", int_type
+            )
             operation += f"""
                 if ({coord} == -1) {{
-                    out[i] = static_cast<F>({cval});
+                    out[i] = static_cast<F>(cval);
                     return;
                 }}
             """
     else:
-        for i, coord in enumerate(input_indices):
-            operation += _pad_boundary_ops(mode, coord, f"{in_size_prefix}_{i}", int_type)
+        for j, coord in enumerate(input_indices):
+            operation += _pad_boundary_ops(
+                mode, coord, f"{in_size_prefix}_{j}", int_type
+            )
 
-    raveled_idx = _gen_raveled(ndim, shape_prefix=in_size_prefix, index_prefix=in_index_prefix, order=order)
+    raveled_idx = _gen_raveled(
+        ndim, shape_prefix=in_size_prefix, index_prefix=in_index_prefix,
+        order=order
+    )
     operation += f"""
     // set output based on raveled index into the input array
-    // currently assumes C-ordered output
     out[i] = arr[{raveled_idx}];
     """
 
+    in_params = "raw F arr, raw I pad_widths"
+    if mode == 'constant':
+        in_params += ", float64 cval"
+
     kernel_name = f"pad_{ndim}d_order{order}_{mode}"
-    if mode == "constant":
-        kernel_name += f"_c{str(cval).replace('.', '_').replace('-', 'm')}"
     if int_type != "int":
         kernel_name += f"_{int_type.replace(' ', '_')}_idx"
+
     return cupy.ElementwiseKernel(
-        in_params="raw F arr, raw I pad_widths",
+        in_params=in_params,
         out_params="raw F out",
         operation=operation,
         name=kernel_name)

@@ -410,8 +410,10 @@ def _as_pairs(x, ndim, as_index=False):
 #    return (array,)
 
 
-def _can_use_elementwise_kernel(mode, kwargs):
+def _can_use_elementwise_kernel(arr, mode, kwargs):
     """Determine if we can use an ElementwiseKernel from pad_elementwise.py"""
+    if arr.ndim == 0 or arr.size == 0:
+        return False
     if mode in ('edge', 'wrap'):
         return True
     elif mode == 'constant':
@@ -664,7 +666,7 @@ def pad(array, pad_width, mode='constant', **kwargs):
             )
         )
 
-    if _can_use_elementwise_kernel(mode, kwargs):
+    if _can_use_elementwise_kernel(array, mode, kwargs):
         # import here to avoid circular import
         from cupy._padding.pad_elementwise import _get_pad_kernel
 
@@ -674,13 +676,20 @@ def pad(array, pad_width, mode='constant', **kwargs):
             for size, (left, right) in zip(array.shape, pad_width)
         )
 
-        order = 'F' if array.flags.fnc else 'C'  # Fortran and not also C-order
-        if not array.flags.forc:
-            # make non-contiguous input C-contiguous
-            array = cp.ascontiguousarray(array)
-
-        # kernel only currently implemented for order='C'
-        padded = cupy.empty(new_shape, dtype=array.dtype, order=order)
+        if False:
+            # TODO: Fortran-ordered case needs bug fix
+            cast_output_to_F_order = False
+            order = 'F' if array.flags.fnc else 'C'  # Fortran and not also C-order
+            if not array.flags.forc:
+                # make non-contiguous input C-contiguous
+                array = cupy.ascontiguousarray(array)
+            # kernel only currently implemented for order='C'
+            padded = cupy.empty(new_shape, dtype=array.dtype, order=order)
+        else:
+            cast_output_to_F_order = array.flags.fnc
+            array = cupy.ascontiguousarray(array)
+            padded = cupy.empty(new_shape, dtype=array.dtype, order='C')
+            order = 'C'
 
         (int_type, np_type) = (('int', cupy.int32) if padded.size < (1 << 31)
                                else ('ptrdiff_t', cupy.intp))
@@ -688,8 +697,15 @@ def pad(array, pad_width, mode='constant', **kwargs):
             ndim=padded.ndim, mode=mode, int_type=int_type, order=order
         )
         # pad_width must be C-contiguous
-        pad_width = cupy.asarray(pad_width, dtype=np_type, order='C')
-        kern(array, pad_width, padded, size=padded.size)
+        pad_width = cupy.asarray(pad_width, dtype=np_type).ravel()
+        if mode == 'constant':
+            # `_can_use_elementwise_kernel` excludes cases with non-scalar cval
+            cval = float(kwargs.get('constant_values', 0))
+            kern(array, pad_width, cval, padded, size=padded.size)
+        else:
+            kern(array, pad_width, padded, size=padded.size)
+        if cast_output_to_F_order:
+            padded = cupy.asfortranarray(padded)
         return padded
 
     if mode == 'constant':
