@@ -102,19 +102,20 @@ def _generate_indices_ops(
     return f'{int_type} _i = i;\n{body}\n{int_type} {index_prefix}_{idx_largest_stride} = _i;\n'
 
 
-def _gen_raveled(ndim, stride_prefix='stride', index_prefix='i'):
+def _gen_raveled(ndim, stride_prefix='stride', index_prefix='i', order=None):
     """Generate raveled index for c-ordered memory layout
 
     For index_prefix='i', the indices are (i_0, i_1, ....)
     For stride_prefix='stride', the stride is (stride_0, stride_1, ....)
     """
     return ' + '.join(
-        f'{stride_prefix}_{j} * {index_prefix}_{j}' for j in range(ndim)
+            f'{stride_prefix}_{j} * {index_prefix}_{j}' for j in range(ndim)
     )
 
 
-def _get_pad_kernel_code(ndim=3, int_type='int', mode='edge', order='C'):
+def _get_pad_kernel_code(pad_starts, int_type='int', mode='edge', order='C'):
     # variables storing shape of the output array
+    ndim = len(pad_starts)
     out_size_prefix = 'shape'
     # out_stride_prefix = 'stride'
     operation = _generate_size_vars(
@@ -146,7 +147,7 @@ def _get_pad_kernel_code(ndim=3, int_type='int', mode='edge', order='C'):
     # compute unraveled indices into the input array
     # (i_0, i_1, ...)
     in_index_prefix = 'i'
-    operation += '\n'.join([f'{int_type} {in_index_prefix}_{j} = {out_index_prefix}_{j} - pad_widths[{2*j}];'  # noqa
+    operation += '\n'.join([f'{int_type} {in_index_prefix}_{j} = {out_index_prefix}_{j} - {pad_starts[j]};'  # noqa
                            for j in range(ndim)])
     operation += '\n'
     input_indices = tuple(f'{in_index_prefix}_{j}' for j in range(ndim))
@@ -171,7 +172,8 @@ def _get_pad_kernel_code(ndim=3, int_type='int', mode='edge', order='C'):
             )
 
     raveled_idx = _gen_raveled(
-        ndim, stride_prefix=in_stride_prefix, index_prefix=in_index_prefix
+        ndim, stride_prefix=in_stride_prefix, index_prefix=in_index_prefix,
+        order=order,
     )
     operation += f"""
     // set output based on raveled index into the input array
@@ -182,19 +184,19 @@ def _get_pad_kernel_code(ndim=3, int_type='int', mode='edge', order='C'):
 
 
 @cupy._util.memoize(for_each_device=True)
-def _get_pad_kernel(ndim=3, int_type='int', mode='edge', order='C'):
-    operation = _get_pad_kernel_code(ndim, int_type, mode, order)
+def _get_pad_kernel(pad_starts, int_type='int', mode='edge', order='C'):
+    operation = _get_pad_kernel_code(pad_starts, int_type, mode, order)
 
-    in_params = "raw F arr, raw I pad_widths"
+    in_params = "raw F arr"
     if mode == 'constant':
         in_params += ", float64 cval"
 
-    kernel_name = f"pad_{ndim}d_order{order}_{mode}"
+    kernel_name = f"pad_{len(pad_starts)}d_order{order}_{mode}"
     if int_type != "int":
         kernel_name += f"_{int_type.replace(' ', '_')}_idx"
 
     return cupy.ElementwiseKernel(
         in_params=in_params,
         out_params="raw F out",
-        operation=_get_pad_kernel_code(ndim, int_type, mode, order),
+        operation=_get_pad_kernel_code(pad_starts, int_type, mode, order),
         name=kernel_name)

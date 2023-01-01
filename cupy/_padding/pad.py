@@ -697,16 +697,18 @@ def pad(array, pad_width, mode='constant', **kwargs):
         (int_type, np_type) = (('int', cupy.int32) if padded.size < (1 << 31)
                                else ('ptrdiff_t', cupy.intp))
         kern = _get_pad_kernel(
-            ndim=padded.ndim, mode=mode, int_type=int_type, order=order
+            pad_starts=tuple(p[0] for p in pad_width),
+            mode=mode,
+            int_type=int_type,
+            order=order,
         )
         # pad_width must be C-contiguous
-        pad_width = cupy.asarray(pad_width, dtype=np_type).ravel()
         if mode == 'constant':
             # `_can_use_elementwise_kernel` excludes cases with non-scalar cval
             cval = float(kwargs.get('constant_values', 0))
-            kern(array, pad_width, cval, padded, size=padded.size)
+            kern(array, cval, padded, size=padded.size)
         else:
-            kern(array, pad_width, padded, size=padded.size)
+            kern(array, padded, size=padded.size)
         if cast_output_to_F_order:
             padded = cupy.asfortranarray(padded)
         return padded
