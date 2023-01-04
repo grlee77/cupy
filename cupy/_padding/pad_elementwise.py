@@ -1,7 +1,7 @@
 import cupy
 
 
-def _pad_boundary_ops(mode, var_name, size, int_t="int"):
+def _pad_boundary_ops(mode, var_name, size, int_t="int", no_singleton=False):
     T = 'int' if int_t == 'int' else 'long long'
     min_func = 'min'
     max_func = 'max'
@@ -12,11 +12,12 @@ def _pad_boundary_ops(mode, var_name, size, int_t="int"):
         }}'''
     elif mode == 'symmetric':
         ops = f'''
-        if ({var_name} < 0) {{
-            {var_name} = - 1 -{var_name};
-        }}
-        {var_name} %= {size} * 2;
-        {var_name} = {min_func}({var_name}, 2 * {size} - 1 - {var_name});'''
+            if ({var_name} < 0) {{
+                {var_name} = - 1 -{var_name};
+            }}
+            {var_name} %= {size} * 2;
+            {var_name} = {min_func}({var_name}, 2 * {size} - 1 - {var_name});
+        '''
     elif mode == 'reflect':
         ops = f'''
         if ({size} == 1) {{
@@ -25,9 +26,21 @@ def _pad_boundary_ops(mode, var_name, size, int_t="int"):
             if ({var_name} < 0) {{
                 {var_name} = -{var_name};
             }}
+            if ({var_name} >= {size}) {{
+                {var_name} = 1 + ({var_name} - 1) % (({size} - 1) * 2);
+                {var_name} = {min_func}({var_name}, 2 * {size} - 2 - {var_name});
+            }}
+        }}'''
+    elif mode == 'reflect_no_singleton_dim':
+        ops = f'''
+        if ({var_name} < 0) {{
+            {var_name} = -{var_name};
+        }}
+        if ({var_name} >= {size}) {{
             {var_name} = 1 + ({var_name} - 1) % (({size} - 1) * 2);
             {var_name} = {min_func}({var_name}, 2 * {size} - 2 - {var_name});
-        }}'''
+        }}
+        '''
     elif mode == 'edge':
         ops = f'''{var_name} = {min_func}({max_func}(static_cast<{T}>({var_name}), static_cast<{T}>(0)), static_cast<{T}>({size} - 1));'''  # noqa
     elif mode == 'wrap':
@@ -35,7 +48,8 @@ def _pad_boundary_ops(mode, var_name, size, int_t="int"):
         {var_name} %= {size};
         if ({var_name} < 0) {{
             {var_name} += {size};
-        }}'''
+        }}
+        '''
     return ops + "\n"
 
 
@@ -154,6 +168,9 @@ def _get_pad_kernel_code(pad_starts, int_type='int', mode='edge', order='C'):
 
     # impose boundary condition
 
+    range_cond = f" || ".join(f"({coord} < 0) || ({coord} >= {in_size_prefix}_{j})" for j, coord in enumerate(input_indices))
+    operation += f"bool range_cond = {range_cond};"
+    operation += "if (range_cond) {\n"
     if mode == "constant":
         for j, coord in enumerate(input_indices):
             operation += _pad_boundary_ops(
@@ -170,6 +187,7 @@ def _get_pad_kernel_code(pad_starts, int_type='int', mode='edge', order='C'):
             operation += _pad_boundary_ops(
                 mode, coord, f"{in_size_prefix}_{j}", int_type
             )
+    operation += "}\n"
 
     raveled_idx = _gen_raveled(
         ndim, stride_prefix=in_stride_prefix, index_prefix=in_index_prefix,

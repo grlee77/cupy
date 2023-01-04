@@ -410,21 +410,26 @@ def _as_pairs(x, ndim, as_index=False):
 #    return (array,)
 
 
-def _can_use_elementwise_kernel(arr, mode, kwargs):
+def _use_elementwise_kernel(arr, mode, kwargs):
     """Determine if we can use an ElementwiseKernel from pad_elementwise.py"""
+    use_elementwise = False
     if arr.ndim == 0 or arr.size == 0:
         return False
     if mode in ('edge', 'wrap'):
-        return True
-    elif mode == 'constant':
-        # always return False as ElementwiseKernel is slower for constant case
-        return False
-        # # Only a uniform constant is supported in the Elementwise kernel.
-        # # A per-axis constant is not currently supported.
-        # return isinstance(kwargs.get('constant_values', 0), numbers.Number)
+        use_elementwise = True
+    # elif mode == 'constant':
+    #     # Only a uniform constant is supported in the Elementwise kernel.
+    #     # A per-axis constant is not currently supported.
+    #     return isinstance(kwargs.get('constant_values', 0), numbers.Number)
     elif mode in ('symmetric', 'reflect'):
         # only the default 'even' reflect type is supported
-        return kwargs.get('reflect_type', 'even') == 'even'
+        use_elementwise = kwargs.get('reflect_type', 'even') == 'even'
+    if use_elementwise:
+        if (arr.ndim > 2 and (arr.flags.fnc and arr.nbytes > 5_000_000)):
+            # Empirically found slower performance for large Fortran-ordered
+            # arrays with ndim > 2.
+            return False
+        return True
     return False
 
 
@@ -668,31 +673,24 @@ def pad(array, pad_width, mode='constant', **kwargs):
             )
         )
 
-    if _can_use_elementwise_kernel(array, mode, kwargs):
+    if _use_elementwise_kernel(array, mode, kwargs):
         # import here to avoid circular import
         from cupy._padding.pad_elementwise import _get_pad_kernel
+
+        if mode == 'reflect' and min(array.shape) > 1:
+            mode = 'reflect_no_singleton_dim'
+
+        if not array.flags.forc:
+            # make non-contiguous input C-contiguous
+            array = cupy.ascontiguousarray(array)
 
         # Allocate grown array
         new_shape = tuple(
             left + size + right
             for size, (left, right) in zip(array.shape, pad_width)
         )
-
-        if True:
-            # TODO: Fortran-ordered case without copying needs bug fix
-            cast_output_to_F_order = False
-            order = 'F' if array.flags.fnc else 'C'  # Fortran and not also C-order
-            if not array.flags.forc:
-                # make non-contiguous input C-contiguous
-                array = cupy.ascontiguousarray(array)
-            # kernel only currently implemented for order='C'
-            padded = cupy.empty(new_shape, dtype=array.dtype, order=order)
-        else:
-            # compute in C-order, then cast output to F-order if needed
-            cast_output_to_F_order = array.flags.fnc
-            array = cupy.ascontiguousarray(array)
-            padded = cupy.empty(new_shape, dtype=array.dtype, order='C')
-            order = 'C'
+        order = 'F' if array.flags.fnc else 'C'  # Fortran and not also C-order
+        padded = cupy.empty(new_shape, dtype=array.dtype, order=order)
 
         (int_type, np_type) = (('int', cupy.int32) if padded.size < (1 << 31)
                                else ('ptrdiff_t', cupy.intp))
@@ -709,8 +707,6 @@ def pad(array, pad_width, mode='constant', **kwargs):
             kern(array, cval, padded, size=padded.size)
         else:
             kern(array, padded, size=padded.size)
-        if cast_output_to_F_order:
-            padded = cupy.asfortranarray(padded)
         return padded
 
     if mode == 'constant':
