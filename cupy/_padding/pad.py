@@ -3,7 +3,6 @@ import numbers
 import numpy
 
 import cupy
-from cupy._core import internal
 
 ###############################################################################
 # Private utility functions.
