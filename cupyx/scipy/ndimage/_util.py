@@ -3,6 +3,10 @@ import warnings
 from collections.abc import Iterable
 
 import numpy
+try:
+    from numpy.exceptions import AxisError
+except ImportError:
+    from numpy import AxisError
 
 import cupy
 
@@ -104,7 +108,7 @@ def _check_axes(axes, ndim):
         for ax in axes:
             axes = tuple(operator.index(ax) for ax in axes)
             if ax < -ndim or ax > ndim - 1:
-                raise ValueError(f"specified axis: {ax} is out of range")
+                raise AxisError(f"specified axis: {ax} is out of range")
         axes = tuple(ax % ndim if ax < 0 else ax for ax in axes)
     else:
         message = "axes must be an integer, iterable of integers, or None"
