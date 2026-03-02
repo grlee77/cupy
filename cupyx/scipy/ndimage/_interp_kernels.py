@@ -478,6 +478,11 @@ def _generate_interp_custom(
 
     ops = []
 
+    # indicate the input and output arrays don't overlap so the compiler
+    # can use LDG (read-only cache) instead of potentially slow LD cache.
+    # x is guaranteed C-contiguous by (_filter_input / ascontiguousarray)
+    ops.append("const X* __restrict__ x_ptr = &x[0];")
+
     # When looping over the last batch axis, we process all batch elements
     # in a single kernel thread. Spatial coordinates are computed once,
     # and the batch loop is placed as the innermost loop.
@@ -632,7 +637,7 @@ def _generate_interp_custom(
             }} else {{
                 #pragma unroll 4
                 for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
-                    y[out_base_idx + batch_idx] = ({internal_dtype})x[{_spatial_coord_idx} + batch_idx];
+                    y[out_base_idx + batch_idx] = ({internal_dtype})x_ptr[{_spatial_coord_idx} + batch_idx];
                 }}
             }}'''  # noqa: E501
                 )
@@ -641,7 +646,7 @@ def _generate_interp_custom(
                     f'''
             #pragma unroll 4
             for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
-                y[out_base_idx + batch_idx] = ({internal_dtype})x[{_spatial_coord_idx} + batch_idx];
+                y[out_base_idx + batch_idx] = ({internal_dtype})x_ptr[{_spatial_coord_idx} + batch_idx];
             }}'''  # noqa: E501
                 )
         else:
@@ -660,13 +665,13 @@ def _generate_interp_custom(
             if ({_cond}) {{
                 out = {cval};
             }} else {{
-                out = ({internal_dtype})x[{_coord_idx}];
+                out = ({internal_dtype})x_ptr[{_coord_idx}];
             }}'''
                 )
             else:
                 ops.append(
                     f'''
-            out = ({internal_dtype})x[{_coord_idx}];'''
+            out = ({internal_dtype})x_ptr[{_coord_idx}];'''
                 )
 
     elif order == 1:
@@ -776,7 +781,7 @@ def _generate_interp_custom(
                     }} else {{
                         #pragma unroll 4
                         for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
-                            {internal_dtype} val = ({internal_dtype})x[ic_base + batch_idx];
+                            {internal_dtype} val = ({internal_dtype})x_ptr[ic_base + batch_idx];
                             out_batch[batch_idx] += val * ({internal_dtype})spatial_weight;
                         }}
                     }}'''  # noqa: E501
@@ -788,7 +793,7 @@ def _generate_interp_custom(
                     {int_t} ic_base = {_spatial_coord_idx};
                     #pragma unroll 4
                     for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
-                        {internal_dtype} val = ({internal_dtype})x[ic_base + batch_idx];
+                        {internal_dtype} val = ({internal_dtype})x_ptr[ic_base + batch_idx];
                         out_batch[batch_idx] += val * ({internal_dtype})spatial_weight;
                     }}'''  # noqa: E501
                 )
@@ -957,7 +962,7 @@ def _generate_interp_custom(
                     }} else {{
                         #pragma unroll 4
                         for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
-                            {internal_dtype} val = ({internal_dtype})x[ic_base + batch_idx];
+                            {internal_dtype} val = ({internal_dtype})x_ptr[ic_base + batch_idx];
                             out_batch[batch_idx] += val * ({internal_dtype})spatial_weight;
                         }}
                     }}'''  # noqa: E501
@@ -969,7 +974,7 @@ def _generate_interp_custom(
                     {int_t} ic_base = {_spatial_coord_idx};
                     #pragma unroll 4
                     for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
-                        {internal_dtype} val = ({internal_dtype})x[ic_base + batch_idx];
+                        {internal_dtype} val = ({internal_dtype})x_ptr[ic_base + batch_idx];
                         out_batch[batch_idx] += val * ({internal_dtype})spatial_weight;
                     }}'''  # noqa: E501
                 )
@@ -1029,14 +1034,14 @@ def _generate_interp_custom(
             if ({_cond}) {{
                 out += {cval} * ({internal_dtype})({_weight});
             }} else {{
-                {internal_dtype} val = ({internal_dtype})x[{_coord_idx}];
+                {internal_dtype} val = ({internal_dtype})x_ptr[{_coord_idx}];
                 out += val * ({internal_dtype})({_weight});
             }}'''
             )
         else:
             ops.append(
                 f'''
-            {internal_dtype} val = ({internal_dtype})x[{_coord_idx}];
+            {internal_dtype} val = ({internal_dtype})x_ptr[{_coord_idx}];
             out += val * ({internal_dtype})({_weight});'''
             )
 
