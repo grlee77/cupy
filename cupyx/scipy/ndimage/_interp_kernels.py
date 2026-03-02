@@ -544,6 +544,7 @@ def _generate_interp_custom(
                 f'''
         if ({_cond})
         {{
+            #pragma unroll 4
             for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                 y[out_base_idx + batch_idx] = {cval};
             }}
@@ -624,10 +625,12 @@ def _generate_interp_custom(
                 ops.append(
                     f'''
             if ({_cond}) {{
+                #pragma unroll 4
                 for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                     y[out_base_idx + batch_idx] = {cval};
                 }}
             }} else {{
+                #pragma unroll 4
                 for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                     y[out_base_idx + batch_idx] = ({internal_dtype})x[{_spatial_coord_idx} + batch_idx];
                 }}
@@ -636,6 +639,7 @@ def _generate_interp_custom(
             else:
                 ops.append(
                     f'''
+            #pragma unroll 4
             for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                 y[out_base_idx + batch_idx] = ({internal_dtype})x[{_spatial_coord_idx} + batch_idx];
             }}'''  # noqa: E501
@@ -728,6 +732,7 @@ def _generate_interp_custom(
             ops.append(
                 f'''
             {internal_dtype} out_batch[{batch_size}];
+            #pragma unroll 4
             for ({uint_t} b = 0; b < batch_size; b++) {{ out_batch[b] = 0.0; }}'''  # noqa: E501
             )
 
@@ -764,10 +769,12 @@ def _generate_interp_custom(
                     W spatial_weight = {_spatial_weight};
                     {int_t} ic_base = {_spatial_coord_idx};
                     if ({_spatial_cond}) {{
+                        #pragma unroll 4
                         for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                             out_batch[batch_idx] += {cval} * ({internal_dtype})spatial_weight;
                         }}
                     }} else {{
+                        #pragma unroll 4
                         for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                             {internal_dtype} val = ({internal_dtype})x[ic_base + batch_idx];
                             out_batch[batch_idx] += val * ({internal_dtype})spatial_weight;
@@ -779,6 +786,7 @@ def _generate_interp_custom(
                     f'''
                     W spatial_weight = {_spatial_weight};
                     {int_t} ic_base = {_spatial_coord_idx};
+                    #pragma unroll 4
                     for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                         {internal_dtype} val = ({internal_dtype})x[ic_base + batch_idx];
                         out_batch[batch_idx] += val * ({internal_dtype})spatial_weight;
@@ -792,6 +800,7 @@ def _generate_interp_custom(
             if integer_output:
                 ops.append(
                     f'''
+            #pragma unroll 4
             for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                 y[out_base_idx + batch_idx] = (Y)rint(({float_type})out_batch[batch_idx]);
             }}'''  # noqa: E501
@@ -799,6 +808,7 @@ def _generate_interp_custom(
             else:
                 ops.append(
                     f'''
+            #pragma unroll 4
             for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                 y[out_base_idx + batch_idx] = (Y)out_batch[batch_idx];
             }}'''  # noqa: E501
@@ -907,6 +917,7 @@ def _generate_interp_custom(
             ops.append(
                 f'''
             {internal_dtype} out_batch[{batch_size}];
+            #pragma unroll 4
             for ({uint_t} b = 0; b < batch_size; b++) {{ out_batch[b] = 0.0; }}'''  # noqa: E501
             )
 
@@ -939,10 +950,12 @@ def _generate_interp_custom(
                     W spatial_weight = {_spatial_weight};
                     {int_t} ic_base = {_spatial_coord_idx};
                     if ({_spatial_cond}) {{
+                        #pragma unroll 4
                         for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                             out_batch[batch_idx] += {cval} * ({internal_dtype})spatial_weight;
                         }}
                     }} else {{
+                        #pragma unroll 4
                         for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                             {internal_dtype} val = ({internal_dtype})x[ic_base + batch_idx];
                             out_batch[batch_idx] += val * ({internal_dtype})spatial_weight;
@@ -954,6 +967,7 @@ def _generate_interp_custom(
                     f'''
                     W spatial_weight = {_spatial_weight};
                     {int_t} ic_base = {_spatial_coord_idx};
+                    #pragma unroll 4
                     for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                         {internal_dtype} val = ({internal_dtype})x[ic_base + batch_idx];
                         out_batch[batch_idx] += val * ({internal_dtype})spatial_weight;
@@ -967,6 +981,7 @@ def _generate_interp_custom(
             if integer_output:
                 ops.append(
                     f'''
+            #pragma unroll 4
             for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                 y[out_base_idx + batch_idx] = (Y)rint(({float_type})out_batch[batch_idx]);
             }}'''  # noqa: E501
@@ -974,6 +989,7 @@ def _generate_interp_custom(
             else:
                 ops.append(
                     f'''
+            #pragma unroll 4
             for ({uint_t} batch_idx = 0; batch_idx < batch_size; batch_idx++) {{
                 y[out_base_idx + batch_idx] = (Y)out_batch[batch_idx];
             }}'''  # noqa: E501
