@@ -363,7 +363,7 @@ def map_coordinates(input, coordinates, output=None, order=3,
 
 def affine_transform(input, matrix, offset=0.0, output_shape=None, output=None,
                      order=3, mode='constant', cval=0.0, prefilter=True, *,
-                     texture_memory=False, double_precision=True):
+                     texture_memory=False, double_precision=False):
     """Apply an affine transformation.
 
     Given an output image pixel index vector ``o``, the pixel value is
@@ -420,6 +420,9 @@ def affine_transform(input, matrix, offset=0.0, output_shape=None, output=None,
             - ``order=0`` (nearest neighbor) and ``order=1`` (linear
                 interpolation)
             - NVIDIA CUDA GPUs
+        double_precision (bool): If True, always use double precision
+            internally like SciPy. When false, single precision floats and
+            8 or 16-bit integer types will use single precision internally.
 
     Returns:
         cupy.ndarray or None:
@@ -569,7 +572,7 @@ def _minmax(coor, minc, maxc):
 
 
 def rotate(input, angle, axes=(1, 0), reshape=True, output=None, order=3,
-           mode='constant', cval=0.0, prefilter=True):
+           mode='constant', cval=0.0, prefilter=True, double_precision=False):
     """Rotate an array.
 
     The array is rotated in the plane defined by the two axes given by the
@@ -601,6 +604,9 @@ def rotate(input, angle, axes=(1, 0), reshape=True, output=None, order=3,
             slightly blurred if ``order > 1``, unless the input is prefiltered,
             i.e. it is the result of calling ``spline_filter`` on the original
             input.
+        double_precision (bool): If True, always use double precision
+            internally like SciPy. When false, single precision floats and
+            8 or 16-bit integer types will use single precision internally.
 
     Returns:
         cupy.ndarray or None:
@@ -668,7 +674,8 @@ def rotate(input, angle, axes=(1, 0), reshape=True, output=None, order=3,
     offset = cupy.asarray(offset)
 
     return affine_transform(input, matrix, offset, output_shape, output, order,
-                            mode, cval, prefilter, double_precision=False)
+                            mode, cval, prefilter,
+                            double_precision=double_precision)
 
 
 def shift(input, shift, output=None, order=3, mode='constant', cval=0.0,
