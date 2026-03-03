@@ -26,6 +26,10 @@ math_constants_preamble = r'''
 
 spline_weights_inline = _spline_kernel_weights.spline_weights_inline
 
+# Empirical threshold above which using loop_batch_axis=True begins to become
+# disadvantageous.
+loop_batch_max_channels = 12
+
 
 def _get_coord_map(ndim, nprepad=0, float_type=None, batch_axes=None,
                    loop_batch_axis=False):
@@ -1076,6 +1080,21 @@ def _generate_interp_custom(
     return operation, name
 
 
+def use_loop_batch(batch_axes, ndim, yshape):
+    """Whether batch optimization over the final axis should be applied.
+
+    If the last axis (contiguous axis) is a batch axis, we can compute the
+    weights once and then loop over this axis in an inner loop.
+
+    Only enabled when there is at least one spatial axis (ndim > 1).
+
+    Empirically, restrict this optimization to batch size <= 12. Performance
+    degradation was observed at higher batch sizes.
+    """
+    return batch_axes == (
+        ndim - 1,) and ndim > 1 and yshape[-1] <= loop_batch_max_channels
+
+
 @cupy._util.memoize(for_each_device=True)
 def _get_map_kernel(ndim, large_int, yshape, mode, cval=0.0, order=1,
                     integer_output=False, nprepad=0, float_dtype=cupy.double,
@@ -1084,7 +1103,7 @@ def _get_map_kernel(ndim, large_int, yshape, mode, cval=0.0, order=1,
 
     # Optimize for contiguous batch axis at the end
     # Only enable when there's at least one spatial axis (ndim > 1)
-    loop_batch_axis = batch_axes == (ndim - 1,) and ndim > 1
+    loop_batch_axis = use_loop_batch(batch_axes, ndim, yshape)
     if loop_batch_axis:
         out_params = 'raw Y y'
         size = math.prod(yshape[:-1])
@@ -1126,7 +1145,7 @@ def _get_shift_kernel(ndim, large_int, yshape, mode, cval=0.0, order=1,
 
     # Optimize for contiguous batch axis at the end
     # Only enable when there's at least one spatial axis (ndim > 1)
-    loop_batch_axis = batch_axes == (ndim - 1,) and ndim > 1
+    loop_batch_axis = use_loop_batch(batch_axes, ndim, yshape)
     if loop_batch_axis:
         out_params = 'raw Y y'
         size = math.prod(yshape[:-1])
@@ -1164,7 +1183,7 @@ def _get_zoom_shift_kernel(ndim, large_int, yshape, mode, cval=0.0, order=1,
 
     # Optimize for contiguous batch axis at the end
     # Only enable when there's at least one spatial axis (ndim > 1)
-    loop_batch_axis = batch_axes == (ndim - 1,) and ndim > 1
+    loop_batch_axis = use_loop_batch(batch_axes, ndim, yshape)
     if loop_batch_axis:
         out_params = 'raw Y y'
         size = math.prod(yshape[:-1])
@@ -1206,7 +1225,7 @@ def _get_zoom_kernel(ndim, large_int, yshape, mode, cval=0.0, order=1,
 
     # Optimize for contiguous batch axis at the end
     # Only enable when there's at least one spatial axis (ndim > 1)
-    loop_batch_axis = batch_axes == (ndim - 1,) and ndim > 1
+    loop_batch_axis = use_loop_batch(batch_axes, ndim, yshape)
     if loop_batch_axis:
         out_params = 'raw Y y'
         size = math.prod(yshape[:-1])
@@ -1243,7 +1262,7 @@ def _get_affine_kernel(ndim, large_int, yshape, mode, cval=0.0, order=1,
 
     # Optimize for contiguous batch axis at the end
     # Only enable when there's at least one spatial axis (ndim > 1)
-    loop_batch_axis = batch_axes == (ndim - 1,) and ndim > 1
+    loop_batch_axis = use_loop_batch(batch_axes, ndim, yshape)
     if loop_batch_axis:
         out_params = 'raw Y y'
         size = math.prod(yshape[:-1])
