@@ -363,7 +363,7 @@ def map_coordinates(input, coordinates, output=None, order=3,
 
 def affine_transform(input, matrix, offset=0.0, output_shape=None, output=None,
                      order=3, mode='constant', cval=0.0, prefilter=True, *,
-                     texture_memory=False, float64_coords=True):
+                     texture_memory=False, double_precision=True):
     """Apply an affine transformation.
 
     Given an output image pixel index vector ``o``, the pixel value is
@@ -472,9 +472,10 @@ def affine_transform(input, matrix, offset=0.0, output_shape=None, output=None,
     if output_shape is None:
         output_shape = input.shape
 
-    float_dtype = cupy.float64
-    if not float64_coords:
-        float_dtype = cupy.promote_types(input.real.dtype, cupy.float32)
+    float_dtype = (
+        cupy.float64 if double_precision
+        else cupy.promote_types(input.real.dtype, cupy.float32)
+    )
     if mode == 'opencv' or mode == '_opencv_edge':
         if matrix.ndim == 1:
             matrix = cupy.diag(matrix)
@@ -667,7 +668,7 @@ def rotate(input, angle, axes=(1, 0), reshape=True, output=None, order=3,
     offset = cupy.asarray(offset)
 
     return affine_transform(input, matrix, offset, output_shape, output, order,
-                            mode, cval, prefilter, float64_coords=False)
+                            mode, cval, prefilter, double_precision=False)
 
 
 def shift(input, shift, output=None, order=3, mode='constant', cval=0.0,
@@ -879,7 +880,8 @@ def zoom(input, zoom, output=None, order=3, mode='constant', cval=0.0,
         # this occurs when input_shape[j] == output_shape[j]
         batch_axes = tuple(
             j
-            for j, (in_s, out_s) in enumerate(zip(input.shape, output_shape))
+            for j, (in_s, out_s) in enumerate(
+                zip(input.shape, output_shape))
             if in_s == out_s
         )
 
